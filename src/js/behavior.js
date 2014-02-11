@@ -10,11 +10,9 @@
         pubsub = dxmPubSub,
         _publish = pubsub.publish,
         _subscribe = pubsub.subscribe,
-        _unsubscribe = pubsub.unsubscribe;
+        _unsubscribe = pubsub.unsubscribe,
 
-    // bindings
-        app.init = init;
-
+        activeScreenIndex = 0;
 
     // internal functions
 
@@ -24,6 +22,13 @@
                 function init(){
 
                     var current_network_state = networkState();
+                        
+                    // Set Screen Heights
+                        setFullscreenHeight();
+
+                    // Prepare for Window Size Changes
+                        setResizeListener();
+                        setResizeResponses();
 
                     // Prepare for Network Changes
                         setNetworkListeners();
@@ -40,6 +45,38 @@
                         }
                 }
 
+        /* SCREENS */
+
+            // set up window resize listener
+                function setResizeListener(){
+
+                    onResize(function(){
+
+                        _publish('window-resized', null, this);
+                    });
+                }
+
+            // set resize responses
+                function setResizeResponses(){
+                    
+                    _subscribe( 'window-resized', 'resize-watchdog', setFullscreenHeight );
+                }
+
+            // set screen heights
+                function setFullscreenHeight(){
+
+                    var screens = document.getElementsByClassName('fullscreen');
+
+                    for (var i = screens.length - 1; i >= 0; i--) {
+
+                        if (i < activeScreenIndex) { break; }
+                        
+                        screens[i].style.height = window.innerHeight + "px"; 
+                    }
+
+                    _publish('screens-resized', null, this);
+                }
+
         /* NETWORK */
 
             // configure network detection
@@ -54,7 +91,7 @@
             // heartbeat
                 function heartbeat(){ 
 
-                    //req vars
+                    // req vars
                     var stopHeartbeat = function(){
 
                         clearInterval( intervals.heartbeat );
@@ -182,6 +219,18 @@
 
         /* UTILS */
 
+            // window resize detection + debouncer
+                function onResize(c,t){
+                    
+                    onresize = function(){
+                        
+                        clearTimeout(t);
+                        t=setTimeout(c,250);
+                    };
+
+                    return c;
+                }
+
             // check if class exists
                 function hasClass(element, nameOfClass){
 
@@ -210,6 +259,6 @@
 
     // LAUNCH APP WHEN DOM IS READY
         document.addEventListener("DOMContentLoaded", function(){
-            app.init();
+            init();
         });
 }());
