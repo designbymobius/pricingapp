@@ -2,18 +2,38 @@
 <html manifest="manifest.appcache">	
 
 	<head>
+		<title>Mizbeach Price Updating App</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
 
-		<!-- build:style inline base -->
-		<!-- note: grunt will output all CSS here -->
-		<!-- /build -->
+		<!-- build:style inline base --><!-- /build -->
 	</head>
 
 	<body>
-		<!-- SITE MARKUP GOES HERE -->
 
-		<!-- build:script inline core -->		
-		<!-- note: grunt will output all JS here -->
-		<!-- /build -->
+		<header id="app-hud">
+			<div class="connection-indicator" title="Network Connection Status"></div>
+			<div class="title"> Mizbeach </div>
+			<div class="settings"></div>
+		</header>
+
+		<div class="fullscreen landing">
+			
+			<div class="headline">Painless Price List Updates</div>
+			<div class="title">A Quick Way to Update Wholesale / Retail Prices and Add New Products to the Price List</div>
+			<div class="subtext">No more struggling with Excel. Access and Edit the Price List from any device that can connect to the Internet. Ready?</div>
+			<div id="start-app" class="btn">Get Started</div>
+		</div>
+
+		<div class="fullscreen landing">
+			
+			<div class="headline">Tasks</div>
+			<div class="title">What are you trying to do?</div>
+			<ul id="task-list">
+				<li><a href="#">Update Product Prices</a></li>
+				<li><a href="#">Add New Products</a></li>
+			</ul>
+		</div>
+
+		<!-- build:script inline core --><!-- /build -->
 	</body>
 </html>

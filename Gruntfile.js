@@ -10,9 +10,10 @@ module.exports = function(grunt){
 				buildDirectory: "svelte",
 				prodDirectory: "prod",
 
-			// array of assets			
-				coreJS: [],
-				coreCSS: [],
+			// array of assets
+				libsJS: ['<%= srcDirectory %>/js/lib/*.js'],			
+				coreJS: ['<%= srcDirectory %>/js/behavior.js'],
+				coreCSS: ['<%= srcDirectory %>/css/base.css'],
 
 		// Configure Plugins
 
@@ -34,7 +35,7 @@ module.exports = function(grunt){
 			
 					core_scripts: {
 						files: {
-							'<%= srcDirectory %>/js/min/core.min.js': '<%= coreJS %>'
+							'<%= srcDirectory %>/js/min/core.min.js': ['<%= libsJS %>','<%= coreJS %>']
 						}
 					}
 				},
@@ -52,11 +53,11 @@ module.exports = function(grunt){
 				htmlbuild: {
 
 			        debug: {
-			            src: '<%= srcDirectory %>/index.*', 
-			            dest: '<%= debugDirectory %>/index.*',
+			            src: '<%= srcDirectory %>/index.html', 
+			            dest: '<%= debugDirectory %>/index.html',
 			            options: {
 			                scripts: {
-			                    core: '<%= coreJS %>',
+			                    core: ['<%= libsJS %>','<%= coreJS %>'],
 			                },
 			                styles: {
 			                    base: '<%= coreCSS %>',
@@ -65,12 +66,12 @@ module.exports = function(grunt){
 			        },
 
 			        production: {
-			            src: '<%= srcDirectory %>/index.*', 
-			            dest: '<%= buildDirectory %>/index.*',
+			            src: '<%= srcDirectory %>/index.html', 
+			            dest: '<%= buildDirectory %>/index.html',
 			            options: {
 			                
 			                scripts: {
-			                    core: '<%= srcDirectory %>/js/min/core.min.js',
+			                    core: ['<%= libsJS %>', '<%= srcDirectory %>/js/min/core.min.js'],
 			                },
 			                
 			                styles: {
@@ -87,17 +88,44 @@ module.exports = function(grunt){
 
 				generate: {
 					
-					src: ['index.*'],
-					dest: '<%= buildDirectory %>/manifest.appcache',
 					options: {
-						basePath:"<%= buildDirectory %>/",
+						basePath:"<%= debugDirectory %>/",
 						fallback: ["/ index.html"],
-						network: ["*"],	
+						network: ["*", "server-check.php"],	
 						preferOnline: true,
 				        timestamp: true,
 				        verbose: false,
 					},				
+					src: ['index.html'],
+					dest: '<%= debugDirectory %>/manifest.appcache'
 				}
+			},
+
+		// copy
+			copy: {
+
+				manifest: {
+				    files: [ 
+				    	{ expand: true, flatten: true, src: ['<%= debugDirectory %>/manifest.appcache'], dest: '<%= buildDirectory %>/'},
+				    	{ expand: true, flatten: true, src: ['<%= debugDirectory %>/manifest.appcache'], dest: '<%= prodDirectory %>/'}
+				    ]
+				},
+
+				php: {
+					files: [
+						{ expand: true, flatten: true, src: ['<%= srcDirectory %>/php/*.php'], dest: '<%= debugDirectory %>/'},
+						{ expand: true, flatten: true, src: ['<%= srcDirectory %>/php/*.php'], dest: '<%= buildDirectory %>/'},
+						{ expand: true, flatten: true, src: ['<%= srcDirectory %>/php/*.php'], dest: '<%= prodDirectory %>/'}
+					]
+				},
+
+				htaccess: {
+				    files: [ 
+				    	{ expand: true, flatten: true, src: ['<%= srcDirectory %>/.htaccess'], dest: '<%= debugDirectory %>/'}, 
+				    	{ expand: true, flatten: true, src: ['<%= srcDirectory %>/.htaccess'], dest: '<%= buildDirectory %>/'}, 
+				    	{ expand: true, flatten: true, src: ['<%= srcDirectory %>/.htaccess'], dest: '<%= prodDirectory %>/'} 
+				    ],
+				},
 			},
 
 		// watch
@@ -105,8 +133,8 @@ module.exports = function(grunt){
 
 				js: {
 					
-					files: '<%= coreJS %>',
-					tasks: ['jshint:beforeconcat', 'htmlbuild:debug', 'manifest', 'uglify', 'jshint:afterconcat', 'htmlbuild:production', 'copy:manifest' ]
+					files: ['<%= libsJS %>','<%= coreJS %>'],
+					tasks: ['jshint:beforeconcat', 'htmlbuild:debug', 'manifest', 'uglify', 'htmlbuild:production', 'copy:manifest' ]
 				},
 
 				css: {
@@ -115,12 +143,28 @@ module.exports = function(grunt){
 					tasks: ['cssmin', 'htmlbuild', 'manifest', 'copy:manifest']
 				},
 
+				php: {
+
+					files: '<%= srcDirectory %>/php/*.php',
+					tasks: 'copy:php'
+				},
+
 				index: {
 
-					files: '<%= srcDirectory %>/index.*',
+					files: '<%= srcDirectory %>/index.html',
 					tasks: ['htmlbuild', 'manifest', 'copy:manifest']
-				}
+				},
 
+				gruntfile: {
+
+					files: 'Gruntfile.js'
+				},
+            
+	            htaccess: {
+	              
+	              files: ['<%= srcDirectory %>/.htaccess'], 
+	              tasks: ['copy:htaccess'],
+	            }
 	        },
 
 		});
