@@ -21,7 +21,11 @@
             // get the app started
                 function init(){
 
+                    // req vars
                     var current_network_state = networkState();
+
+                    // Set Appcache Listeners
+                        setAppcacheListeners();
                         
                     // Set Screen Heights
                         setFullscreenHeight();
@@ -217,6 +221,33 @@
                         _subscribe( 'network-reconnecting', 'light-flicker', flickerNetworkLights );
                 } 
 
+        /* APPCACHE */
+
+            // set appcache listeners
+                function setAppcacheListeners(){
+
+                    if (window.applicationCache){
+
+                        window.applicationCache.addEventListener('downloading', cacheDownloading);
+                        window.applicationCache.addEventListener('updateready', cacheReady);
+                    }
+                }
+
+            // new appcache ready
+                function cacheReady(){     
+
+                    alert('App Has Been Updated and will Restart Now');
+                    window.applicationCache.swapCache();
+                    location.reload(true);
+                }
+
+            // new appcache downloading
+                function cacheDownloading(){
+
+                    alert("Downloading App Updates - Sorry for the Wait");
+                }
+
+
         /* UTILS */
 
             // window resize detection + debouncer
@@ -258,7 +289,8 @@
 
 
     // LAUNCH APP WHEN DOM IS READY
-        document.addEventListener("DOMContentLoaded", function(){
+        document.addEventListener("DOMContentLoaded", function(){ 
+            
             init();
         });
 }());
