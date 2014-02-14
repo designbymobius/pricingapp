@@ -134,19 +134,19 @@ module.exports = function(grunt){
 				js: {
 					
 					files: ['<%= libsJS %>','<%= coreJS %>'],
-					tasks: ['jshint:beforeconcat', 'htmlbuild:debug', 'manifest', 'uglify', 'htmlbuild:production', 'copy:manifest' ]
+					tasks: ['newer:jshint:beforeconcat', 'htmlbuild:debug', 'manifest', 'uglify', 'htmlbuild:production', 'copy:manifest' ]
 				},
 
 				css: {
 
 					files: '<%= coreCSS %>',
-					tasks: ['cssmin', 'htmlbuild', 'manifest', 'copy:manifest']
+					tasks: ['newer:cssmin', 'htmlbuild', 'manifest', 'copy:manifest']
 				},
 
 				php: {
 
 					files: '<%= srcDirectory %>/php/*.php',
-					tasks: 'copy:php'
+					tasks: 'newer:copy:php'
 				},
 
 				index: {
@@ -177,4 +177,8 @@ module.exports = function(grunt){
 		grunt.loadNpmTasks('grunt-contrib-copy');
 		grunt.loadNpmTasks('grunt-html-build');
 		grunt.loadNpmTasks('grunt-manifest');
+		grunt.loadNpmTasks('grunt-newer');
+
+	// Register Tasks
+		grunt.registerTask('prep-js', ['jshint:beforeconcat', 'htmlbuild:debug', 'manifest', 'uglify', 'htmlbuild:production', 'copy:manifest' ]);
 }
