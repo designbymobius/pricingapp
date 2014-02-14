@@ -11,8 +11,16 @@
         _publish = pubsub.publish,
         _subscribe = pubsub.subscribe,
         _unsubscribe = pubsub.unsubscribe,
+        
+        allScreens = document.getElementsByClassName('fullscreen'),
+        screen_setup = {},
 
-        activeScreenIndex = 0;
+        activeScreenIndex = 0,
+        activeScreens = [];
+
+    // bindings
+        screen_setup.landing = setup_landing;
+        screen_setup.tasks = setup_tasks;
 
     // internal functions
 
@@ -24,19 +32,22 @@
                     // req vars
                     var current_network_state = networkState();
 
-                    // Set Appcache Listeners
-                        setAppcacheListeners();
+                    // Load Starting Pages
+                        resetActiveScreens();
                         
                     // Set Screen Heights
                         setFullscreenHeight();
 
                     // Prepare for Window Size Changes
-                        setResizeListener();
                         setResizeResponses();
+                        setResizeListener();
 
                     // Prepare for Network Changes
-                        setNetworkListeners();
                         setNetworkChangeResponses();
+                        setNetworkListeners();
+
+                    // Set Appcache Listeners
+                        setAppcacheListeners();
 
                     // Set Current Network State
                         if( current_network_state === "up"){          
@@ -47,9 +58,77 @@
 
                             _publish("network-down", null, this);           
                         }
+
+                    // Prepare Screen Setup Listeners
+                        screenSetupHandlers();
+
+                        gotoScreen( activeScreenIndex );
+                }
+
+        /* SCREEN SETUPS */
+
+            // landing
+                function setup_landing(screen){
+
+                    // req vars
+                        var startBtn = screen.getElementsByClassName('btn')[0];
+                    
+                    /* SETUP */
+
+                        // listen for teardown event
+                            _subscribe('teardown-screen', 'landing', teardown);
+                        
+                        // bind enter key 
+                            window.addEventListener('keydown', enterHandler);
+
+                        // bind button
+                            startBtn.addEventListener('click', gotoNextScreen);
+
+
+                    function teardown(){
+
+                        // unbind enter key
+                            window.removeEventListener('keydown', enterHandler);
+
+                        //unbind button
+                            startBtn.removeEventListener('click', gotoNextScreen);
+                        
+                        // stop listening to teardown
+                            _unsubscribe('teardown-screen', 'landing');
+                    }
+
+                    function enterHandler(e){
+
+                        if(e.keyCode === 13){
+                            
+                            gotoNextScreen();
+                        }
+                    }
+                }
+
+            // tasks
+                function setup_tasks(screen){
+
+                    /* SETUP */
+                    
+                        // prep for teardown
+                            _subscribe('teardown-screen', 'tasks', teardown);
+
+
+                    function teardown(){
+
+                        // stop listening for teardown
+                            _unsubscribe('teardown-screen', 'tasks');
+                    }
                 }
 
         /* SCREENS */
+
+            // screen setup handler
+                function screenSetupHandlers(){
+
+                    _subscribe("setup-screen", "handyman", do_screen_setup );                    
+                }
 
             // set up window resize listener
                 function setResizeListener(){
@@ -63,23 +142,107 @@
             // set resize responses
                 function setResizeResponses(){
                     
-                    _subscribe( 'window-resized', 'resize-watchdog', setFullscreenHeight );
+                    // when window is resized, resize screens
+                        _subscribe( 'window-resized', 'resize-watchdog', setFullscreenHeight );
+
+                    // when screens are resized, scroll to the active one
+                        _subscribe( 'screens-resized', 'autoscroller', scrollToActiveScreen );
                 }
 
-            // set screen heights
+            // set active screens heights
                 function setFullscreenHeight(){
 
-                    var screens = document.getElementsByClassName('fullscreen');
-
-                    for (var i = screens.length - 1; i >= 0; i--) {
+                    for (var i = activeScreens.length - 1; i >= 0; i--) {
 
                         if (i < activeScreenIndex) { break; }
                         
-                        screens[i].style.height = window.innerHeight + "px"; 
+                        activeScreens[i].style.height = window.innerHeight + "px"; 
                     }
 
                     _publish('screens-resized', null, this);
                 }
+
+            // quickly scroll to active screen
+                function scrollToActiveScreen(){
+
+                    scrollTo( activeScreens[activeScreenIndex].offsetTop, 150 ); 
+                }
+
+            // do screen setup
+                function do_screen_setup(){
+
+                    // req vars
+                    var thisScreen = activeScreens[ activeScreenIndex ],
+                        thisScreenSetupID = thisScreen.id;
+
+                    // scroll to screen when setup is complete
+                        _subscribe(
+                            'setup-complete', 
+                            'handyman', 
+                            function(){ 
+                                
+                                scrollTo( thisScreen.offsetTop );
+
+                                _unsubscribe('setup-complete', 'handyman'); 
+                            }
+                        );
+
+                    // focal screen management
+                        addClass( thisScreen, "focal" );
+                        
+                        _subscribe(
+
+                            'teardown-screen',
+                            'defocalizer',
+                            function(){
+
+                                removeClass(thisScreen, 'focal');
+
+                                _unsubscribe('teardown-screen', 'defocalizer');
+                            }
+                        );
+
+                    // set up this screen
+                        screen_setup[ thisScreenSetupID ](thisScreen);
+
+                    // setup complete!
+                        _publish('setup-complete', null, 'handyman');
+                }
+
+            // deactivate screen and go to a new one
+                function gotoScreen(index){
+
+                    _publish("teardown-screen", null, this);
+
+                    activeScreenIndex = index;
+
+                    _publish("setup-screen", null, this );
+                }
+
+                    function gotoNextScreen(){
+
+                        gotoScreen(activeScreenIndex + 1);
+                    }
+
+            // add active screens
+                function addToActiveScreens( screenClass ){
+
+                    for (var i = 0; i < allScreens.length; i++) {
+                        
+                        if ( hasClass(allScreens[i], screenClass) ) { 
+
+                            activeScreens.push( allScreens[i] );
+                        } 
+                    }
+                }
+
+            // reset active screens
+                function resetActiveScreens(){
+
+                    activeScreens = [];
+                    addToActiveScreens('landing');
+                    addToActiveScreens('tasks');
+                } 
 
         /* NETWORK */
 
@@ -250,6 +413,44 @@
 
         /* UTILS */
 
+            // scroll to 
+               var scrollTo = (function(){
+
+                    var timer, start, factor;
+
+                    return function (target, duration) {
+                        
+                        var offset = window.pageYOffset,
+                            delta  = target - window.pageYOffset; // Y-offset difference
+                            duration = duration || 400;              // default 400ms animation
+                            start = Date.now();                       // get start time
+                            factor = 0;
+
+                        if( timer ) {
+                            clearInterval(timer); // stop any running animations
+                        }
+
+                        function step() {
+                            
+                            var y;
+                            factor = (Date.now() - start) / duration; // get interpolation factor
+
+                            if( factor >= 1 ) {
+                                clearInterval(timer); // stop animation
+                                factor = 1;           // clip to max 1.0
+                            } 
+
+                            y = factor * delta + offset;
+
+                            window.scrollBy(0, y - window.pageYOffset);
+                        }
+
+                        timer = setInterval(step, 10);
+                        
+                        return timer;
+                    };
+                }());
+
             // window resize detection + debouncer
                 function onResize(c,t){
                     
@@ -290,6 +491,8 @@
 
     // LAUNCH APP WHEN DOM IS READY
         document.addEventListener("DOMContentLoaded", function(){ 
+
+            window.goto = gotoScreen;
             
             init();
         });
