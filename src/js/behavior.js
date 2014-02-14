@@ -231,13 +231,23 @@
                         
                         if ( hasClass(allScreens[i], screenClass) ) { 
 
-                            activeScreens.push( allScreens[i] );
+                            // add active class
+                                addClass(allScreens[i], 'active');
+
+                            // add to active screens list
+                                activeScreens.push( allScreens[i] );
                         } 
                     }
                 }
 
             // reset active screens
                 function resetActiveScreens(){
+
+                    for (var i = 0; i < allScreens.length; i++) {
+                        
+                        // remove active class
+                            removeClass(allScreens[i], 'active');                     
+                    }
 
                     activeScreens = [];
                     addToActiveScreens('landing');

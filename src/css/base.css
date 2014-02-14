@@ -17,6 +17,7 @@ html, body {
 
 	position: relative;
 	overflow: hidden;
+	display: none;
 	opacity: 0.4;
 
 	padding: 3.0625em 2.1875em;
@@ -31,6 +32,11 @@ html, body {
 .fullscreen.focal {
 
 	opacity: 1;
+}
+
+.fullscreen.active {
+
+	display: block;
 }
 
 .headline {
