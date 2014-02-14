@@ -140,7 +140,7 @@ module.exports = function(grunt){
 				css: {
 
 					files: '<%= coreCSS %>',
-					tasks: ['newer:cssmin', 'htmlbuild', 'manifest', 'copy:manifest']
+					tasks: ['cssmin', 'htmlbuild', 'manifest', 'copy:manifest']
 				},
 
 				php: {
