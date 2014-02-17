@@ -134,13 +134,13 @@ module.exports = function(grunt){
 				js: {
 					
 					files: ['<%= libsJS %>','<%= coreJS %>'],
-					tasks: ['newer:jshint:beforeconcat', 'htmlbuild:debug', 'manifest', 'uglify', 'htmlbuild:production', 'copy:manifest' ]
+					tasks: 'updateJS'
 				},
 
 				css: {
 
 					files: '<%= coreCSS %>',
-					tasks: ['cssmin', 'htmlbuild', 'manifest', 'copy:manifest']
+					tasks: 'updateCSS'
 				},
 
 				php: {
@@ -152,7 +152,7 @@ module.exports = function(grunt){
 				index: {
 
 					files: '<%= srcDirectory %>/index.html',
-					tasks: ['htmlbuild', 'manifest', 'copy:manifest']
+					tasks: 'updateHTML'
 				},
 
 				gruntfile: {
@@ -167,6 +167,26 @@ module.exports = function(grunt){
 	            }
 	        },
 
+	    // growl-notify
+
+	    	notify_hooks: {
+				
+				options: {
+					enabled: true,
+					max_jshint_notifications: 5, // maximum number of notifications from jshint output
+				}
+			},
+
+			notify: {
+				
+				ready: {
+					options: {
+						title: 'Build Ready!', 
+						message: 'All files are have been updated',
+					}
+				}
+			},
+
 		});
 
 	// Load Plugins	
@@ -177,8 +197,14 @@ module.exports = function(grunt){
 		grunt.loadNpmTasks('grunt-contrib-copy');
 		grunt.loadNpmTasks('grunt-html-build');
 		grunt.loadNpmTasks('grunt-manifest');
+		grunt.loadNpmTasks('grunt-notify');
 		grunt.loadNpmTasks('grunt-newer');
 
 	// Register Tasks
-		grunt.registerTask('prep-js', ['jshint:beforeconcat', 'htmlbuild:debug', 'manifest', 'uglify', 'htmlbuild:production', 'copy:manifest' ]);
+		grunt.registerTask('updateJS', ['newer:jshint:beforeconcat', 'htmlbuild:debug', 'manifest', 'uglify', 'htmlbuild:production', 'copy:manifest', 'notify:ready']);
+		grunt.registerTask('updateCSS', ['cssmin', 'htmlbuild', 'manifest', 'copy:manifest', 'notify:ready']);
+		grunt.registerTask('updateHTML', ['htmlbuild', 'manifest', 'copy:manifest', 'notify:ready']);
+	
+	// Growl Notify Settings Update
+		grunt.task.run('notify_hooks');	
 }
