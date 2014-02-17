@@ -21,6 +21,7 @@
     // bindings
         screen_setup.landing = setup_landing;
         screen_setup.tasks = setup_tasks;
+        screen_setup.add_product_manufacturer = setup_add_product_manufacturer;
 
     // internal functions
 
@@ -110,16 +111,50 @@
                 function setup_tasks(screen){
 
                     /* SETUP */
+
+                        // req vars
+                        var addProductsBtn = document.getElementById('start-add-product');
                     
                         // prep for teardown
                             _subscribe('teardown-screen', 'tasks', teardown);
+
+                    // enable task links
+                        addProductsBtn.addEventListener("click", addProductsWorkflow);
+
+
+                    function addProductsWorkflow(){
+
+                        addToActiveScreens('add-product');
+                        gotoNextScreen();
+                    }
 
 
                     function teardown(){
 
                         // stop listening for teardown
                             _unsubscribe('teardown-screen', 'tasks');
+
+                        // disable task links
+                            addProductsBtn.removeEventListener("click", addProductsWorkflow);
                     }
+                }
+
+            // add product
+                function setup_add_product_manufacturer(){
+
+                    /* SETUP */
+                    
+                        // prep for teardown
+                            _subscribe('teardown-screen', 'add-products-1', teardown);
+
+
+                    function teardown(){
+
+                        // stop listening for teardown
+                            _unsubscribe('teardown-screen', 'add-products-1');
+                    }
+
+
                 }
 
         /* SCREENS */
@@ -127,7 +162,7 @@
             // screen setup handler
                 function screenSetupHandlers(){
 
-                    _subscribe("setup-screen", "handyman", do_screen_setup );                    
+                    _subscribe("setup-screen", "do_screen_setup", do_screen_setup );                    
                 }
 
             // set up window resize listener
@@ -173,21 +208,21 @@
 
                     // req vars
                     var thisScreen = activeScreens[ activeScreenIndex ],
-                        thisScreenSetupID = thisScreen.id;
+                        thisScreenSetupID = thisScreen.id.replace(/\-/g,"_");
 
                     // scroll to screen when setup is complete
                         _subscribe(
                             'setup-complete', 
-                            'handyman', 
+                            'scroll_screen_into_view', 
                             function(){ 
                                 
                                 scrollTo( thisScreen.offsetTop );
 
-                                _unsubscribe('setup-complete', 'handyman'); 
+                                _unsubscribe('setup-complete', 'scroll_screen_into_view'); 
                             }
                         );
 
-                    // focal screen management
+                    // focal screen tracker
                         addClass( thisScreen, "focal" );
                         
                         _subscribe(
@@ -206,7 +241,7 @@
                         screen_setup[ thisScreenSetupID ](thisScreen);
 
                     // setup complete!
-                        _publish('setup-complete', null, 'handyman');
+                        _publish('setup-complete', null, 'do_screen_setup');
                 }
 
             // deactivate screen and go to a new one
@@ -227,6 +262,8 @@
             // add active screens
                 function addToActiveScreens( screenClass ){
 
+                    var new_screens_tally = 0;
+
                     for (var i = 0; i < allScreens.length; i++) {
                         
                         if ( hasClass(allScreens[i], screenClass) ) { 
@@ -236,7 +273,15 @@
 
                             // add to active screens list
                                 activeScreens.push( allScreens[i] );
+
+                            // count new screens added
+                                new_screens_tally = new_screens_tally + 1;
                         } 
+                    }
+
+                    if (new_screens_tally > 0){
+
+                        setFullscreenHeight();
                     }
                 }
 
@@ -419,7 +464,6 @@
 
                     alert("Downloading App Updates - Sorry for the Wait");
                 }
-
 
         /* UTILS */
 

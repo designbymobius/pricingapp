@@ -9,6 +9,10 @@
 	dxm = {};
 	dxm.notification = dxm.notification || {};
 	
+	// System Settings
+	dxm.settings = {};
+	dxm.settings.consoleLog = false;
+
 	// List of Subscribers
 	dxm.notification.subscribers = [];
 	dxm.notification.log = [];
@@ -61,10 +65,9 @@
 
 		publisher = publisher || "unidentified";
 		
-		// get list of subscribers
-		var subscriberList = dxm.notification.subscribers[notification];
-		
-		var informedSubscribers = [];
+		// required vars
+		var subscriberList = dxm.notification.subscribers[notification],
+			informedSubscribers = [];
 
 		
 		for (var subscriber in subscriberList) {
@@ -87,9 +90,17 @@
 		}
 		
 		// update log 
-		dxm.notification.log.push({"type": "publish", "notification": notification, "informedSubscribers": informedSubscribers, "publisher": publisher});			
-		
+		dxm.notification.log.push({"type": "publish", "notification": notification, "informedSubscribers": informedSubscribers, "publisher": publisher});
+
+		if(dxm.settings.consoleLog !== false){
+
+			console.log('\n Published: ' + notification + '\n Publisher: ' + publisher +  '\n Informed: ' + JSON.stringify(informedSubscribers) );
+			console.log("----------------------\n");
+		}		
 	}
 
-	window.dxmPubSub = dxm.notification;	
+	window.dxmPubSub = dxm.notification;
+	window.dxmPubSub.consoleLogOn = function(){ dxm.settings.consoleLog = true; };
+	window.dxmPubSub.consoleLogOff = function(){ dxm.settings.consoleLog = false; };
+	
 })();

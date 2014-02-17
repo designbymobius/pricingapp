@@ -106,6 +106,18 @@ html, body {
 	border-bottom-width: 2px; 
 }
 
+.fullscreen input {
+
+	width: 94%;
+	margin: 1em 3%;
+	font-size: 1em;
+	padding: .125em .5em;
+
+	-webkit-box-sizing: border-box; /* Safari/Chrome, other WebKit */
+	-moz-box-sizing: border-box;    /* Firefox, other Gecko */
+	box-sizing: border-box;         /* Opera/IE 8+ */
+}
+
  /* --------------- */
 /* MODULE SPECIFIC */
 
@@ -211,6 +223,19 @@ body #app-hud .connection-indicator.connection-checking {
 	padding: 0.5em 3.5em 0.5em 1.5em;
 	border-bottom: 1px solid #ddd;
 	font-weight: 900;
+	color: #1087bc;
+
+	cursor: pointer;
+}
+
+#task-list li:hover {
+
+	background-color: #e0f3fc;
+}
+
+#task-list li:active {
+
+	color: #0b5a7d;
 }
 
 #task-list a {
