@@ -113,21 +113,44 @@
                     /* SETUP */
 
                         // req vars
-                        var addProductsBtn = document.getElementById('start-add-product');
+                        var addProductsBtn = document.getElementById('start-add-product'),
+                            contextSettingsMenu = document.getElementById('context-settings'),
+                            cancelTaskBtn = "<div id='cancel-task' class='setting'>cancel task</div>";
                     
                         // prep for teardown
                             _subscribe('teardown-screen', 'tasks', teardown);
 
-                    // enable task links
-                        addProductsBtn.addEventListener("click", addProductsWorkflow);
+                    /* ENABLE TASK LINKS */
+
+                        // add product
+                            addProductsBtn.addEventListener("click", addProductsWorkflow);
 
 
                     function addProductsWorkflow(){
 
-                        addToActiveScreens('add-product');
-                        gotoNextScreen();
-                    }
+                        // activate add product screens 
+                            addToActiveScreens('add-product');
+                        
+                        // progress UI
+                            gotoNextScreen();
 
+                        // create Cancel Task button                            
+                            contextSettingsMenu.innerHTML += cancelTaskBtn;
+
+                        // Cancel Task Button Behavior
+                            document.getElementById('cancel-task').addEventListener("click", function(){
+
+                                // remove btn
+                                    this.parentNode.removeChild(this);
+                                
+                                // deactivate add product screens 
+                                    removeActiveScreens('add-product');
+                                
+                                // go to the last active screen
+                                    gotoScreen( activeScreens.length - 1 );
+
+                            });
+                    }
 
                     function teardown(){
 
@@ -282,6 +305,32 @@
                     if (new_screens_tally > 0){
 
                         setFullscreenHeight();
+                    }
+                }
+
+            // remove active screens
+                function removeActiveScreens( screenClass ){
+
+                    var change_tally = 0;
+
+                    for (var i = allScreens.length - 1; i >= 0; i--){
+                        
+                        if( hasClass(allScreens[i], screenClass) ){
+
+                            // remove active class
+                                removeClass(allScreens[i], 'active');
+
+                            // remove from active screens list
+                                activeScreens.splice(i, 1);
+
+                            // update tally
+                                change_tally = change_tally + 1;
+                        }
+
+                        if (change_tally > 0){
+
+                            setFullscreenHeight();
+                        }
                     }
                 }
 
