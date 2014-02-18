@@ -73,43 +73,51 @@ html, body {
 	text-transform: uppercase;
 	
 	color: #fff;
-	font-weight: 900;
 	background-color: #8ab953;
 
-	border-style: solid;
-	border-color: #3e7400;
+	border-bottom: .25em solid #3e7400;
 
-	font-size: 1em;
-	line-height: 2.5em;
-	word-spacing: 0.125em;
-	letter-spacing: 0.0625em;
-
-	margin: 1.25em 0;
-	border-width: 0 0 .375em 0;	
-
-	text-shadow: 0.0625em 0.125em 0.0625em #3e7400;
-	filter: dropshadow(color=#3e7400, offx=1, offy=2);
-
-	-webkit-border-radius: 0.4375em 0.4375em 0.375em 0.375em;
-	border-radius: 0.4375em 0.4375em 0.375em 0.375em;
+	-webkit-border-radius: 0.416666666666em 0.416666666666em 0.416666666666em 0.416666666666em;
+	border-radius: 0.416666666666em 0.416666666666em 0.416666666666em 0.416666666666em;
 }
 
 .btn:hover {
 
-	top: 2px;
-	border-bottom-width: 4px;
+	top: .05em;
+	border-bottom-width: .2em;
 }
 
 .btn:active {
 
-	top: 4px;
-	border-bottom-width: 2px; 
+	top: .15em;
+	border-bottom-width: .1em; 
+}
+
+.btn.large {
+	
+	font-size: 1em;
+	margin: 1.25em 0;
+	font-weight: 900;
+
+	line-height: 2.5em;
+	word-spacing: 0.125em;
+	letter-spacing: 0.0625em;
+
+	text-shadow: 0.0625em 0.125em 0.0625em #3e7400;
+	filter: dropshadow(color=#3e7400, offx=1, offy=2);
+}
+
+.btn.small {
+
+	padding: .35em .7em;
+	font-size: .75em;
+	float: right;
 }
 
 .fullscreen input {
 
-	width: 94%;
-	margin: 1em 3%;
+	width: 97.5%;
+	margin: 1em 1.25%;
 	font-size: 1em;
 	padding: .125em .5em;
 

@@ -168,15 +168,6 @@ module.exports = function(grunt){
 	        },
 
 	    // growl-notify
-
-	    	notify_hooks: {
-				
-				options: {
-					enabled: true,
-					max_jshint_notifications: 5, // maximum number of notifications from jshint output
-				}
-			},
-
 			notify: {
 				
 				ready: {
@@ -204,7 +195,4 @@ module.exports = function(grunt){
 		grunt.registerTask('updateJS', ['newer:jshint:beforeconcat', 'htmlbuild:debug', 'manifest', 'uglify', 'htmlbuild:production', 'copy:manifest', 'notify:ready']);
 		grunt.registerTask('updateCSS', ['cssmin', 'htmlbuild', 'manifest', 'copy:manifest', 'notify:ready']);
 		grunt.registerTask('updateHTML', ['htmlbuild', 'manifest', 'copy:manifest', 'notify:ready']);
-	
-	// Growl Notify Settings Update
-		grunt.task.run('notify_hooks');	
 }
