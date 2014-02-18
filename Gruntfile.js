@@ -170,10 +170,24 @@ module.exports = function(grunt){
 	    // growl-notify
 			notify: {
 				
-				ready: {
+				html: {
 					options: {
-						title: 'Build Ready!', 
-						message: 'All files are have been updated',
+						title: 'HTML UPDATED', 
+						message: 'Refresh App to View Updated Markup',
+					}
+				},
+				
+				css: {
+					options: {
+						title: 'CSS UPDATED', 
+						message: 'Refresh App to See Style Changes',
+					}
+				},
+				
+				js: {
+					options: {
+						title: 'JS UPDATED', 
+						message: 'Refresh App to Load Javascript Changes',
 					}
 				}
 			},
@@ -192,7 +206,7 @@ module.exports = function(grunt){
 		grunt.loadNpmTasks('grunt-newer');
 
 	// Register Tasks
-		grunt.registerTask('updateJS', ['newer:jshint:beforeconcat', 'htmlbuild:debug', 'manifest', 'uglify', 'htmlbuild:production', 'copy:manifest', 'notify:ready']);
-		grunt.registerTask('updateCSS', ['cssmin', 'htmlbuild', 'manifest', 'copy:manifest', 'notify:ready']);
-		grunt.registerTask('updateHTML', ['htmlbuild', 'manifest', 'copy:manifest', 'notify:ready']);
+		grunt.registerTask('updateJS', ['newer:jshint:beforeconcat', 'htmlbuild:debug', 'manifest', 'uglify', 'htmlbuild:production', 'copy:manifest', 'notify:js']);
+		grunt.registerTask('updateCSS', ['cssmin', 'htmlbuild', 'manifest', 'copy:manifest', 'notify:css']);
+		grunt.registerTask('updateHTML', ['htmlbuild', 'manifest', 'copy:manifest', 'notify:html']);
 }
