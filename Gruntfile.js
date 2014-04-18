@@ -4,6 +4,7 @@ module.exports = function(grunt){
 
 			// req vars
 				pkg: grunt.file.readJSON('package.json'),
+				dbcredentials: grunt.file.readJSON('dbcredentials.json'),
 
 				srcDirectory: "src",
 				debugDirectory: "debug",
@@ -111,12 +112,47 @@ module.exports = function(grunt){
 				    ]
 				},
 
-				php: {
+
+				php_debug:{
+
 					files: [
-						{ expand: true, flatten: true, src: ['<%= srcDirectory %>/php/*.php'], dest: '<%= debugDirectory %>/'},
+						{ expand: true, flatten: true, src: ['<%= srcDirectory %>/php/*.php'], dest: '<%= debugDirectory %>/' }
+					],
+
+					options:{
+
+						processContent: function(content, path){
+
+							// process template 
+								content = grunt.template.process( content );
+
+							return content;
+						}
+					}
+				},
+
+				php_build:{
+					
+					files: [
 						{ expand: true, flatten: true, src: ['<%= srcDirectory %>/php/*.php'], dest: '<%= buildDirectory %>/'},
-						{ expand: true, flatten: true, src: ['<%= srcDirectory %>/php/*.php'], dest: '<%= prodDirectory %>/'}
 					]
+				},
+
+				php_prod:{
+
+					files: [
+						{ expand: true, flatten: true, src: ['<%= srcDirectory %>/php/*.php'], dest: '<%= prodDirectory %>/'}
+					],
+
+					options:{
+
+						processContent: function(content, path){
+
+							grunt.config('build-env', 'prod');
+
+							return grunt.template.process(content);
+						}
+					}
 				},
 
 				htaccess: {
@@ -146,7 +182,7 @@ module.exports = function(grunt){
 				php: {
 
 					files: '<%= srcDirectory %>/php/*.php',
-					tasks: 'newer:copy:php'
+					tasks: ['newer:copy:php_debug', 'newer:copy:php_prod','notify:php']
 				},
 
 				index: {
@@ -188,6 +224,14 @@ module.exports = function(grunt){
 					options: {
 						title: 'JS UPDATED', 
 						message: 'Refresh App to Load Javascript Changes',
+					}
+				},
+
+				php: {
+					options:{
+						title: 'PHP UPDATED',
+						message: 'Server-Side Scripts are Updated',
+
 					}
 				}
 			},
