@@ -35,12 +35,24 @@
 			</ul>
 		</div>
 
-		<div id="add-product-manufacturer" class="fullscreen add-product">
+		<div id="add-product-metadata" class="fullscreen add-product">
 			
-			<div class="headline">Step 1: Product Manufacturer</div>
-			<div class="subtext">What is the name of the company that created the product?</div>
-			<input id="add-product-manufacturer" class="focus" placeholder="Insert Product Manufacturer's Name Here" >
+			<div class="headline">Basic Product Details</div>
+			<div class="title">What is the Product and its Manufacturer's Name? </div>
+			<input class="manufacturer-name" placeholder="Manufacturer">
+			<input class="product-name" placeholder="Product Name">
 			<div class="btn small">Next Step</div>	
+		</div>
+
+		<div id="add-product-confirmation" class="fullscreen add-product">
+			
+			<div class="headline">Review Details</div>
+			<div class="title">Are these details correct? </div>
+			<div id="product-metadata">
+				<span class="manufacturer-name"></span>
+				<span class="product-name"></span>
+			</div>
+			<div id="submit-add-product" class="btn large">Yes - Add It</div>	
 		</div>
 
 		<!-- build:script inline core --><!-- /build -->

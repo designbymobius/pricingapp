@@ -10,18 +10,24 @@
         pubsub = dxmPubSub,
         _publish = pubsub.publish,
         _subscribe = pubsub.subscribe,
+        _subscribe_once = subscribe_once,
         _unsubscribe = pubsub.unsubscribe,
         
         allScreens = document.getElementsByClassName('fullscreen'),
         screen_setup = {},
 
         activeScreenIndex = 0,
-        activeScreens = [];
+        activeScreens = [],
+
+        addProductName,
+        addProductManufacturer,
+        addProductAltname;
 
     // bindings
         screen_setup.landing = setup_landing;
         screen_setup.tasks = setup_tasks;
-        screen_setup.add_product_manufacturer = setup_add_product_manufacturer;
+        screen_setup.add_product_metadata = setup_add_product_metadata;
+        screen_setup.add_product_confirmation = setup_add_product_confirmation;
 
     // internal functions
 
@@ -77,7 +83,7 @@
                     /* SETUP */
 
                         // listen for teardown event
-                            _subscribe('teardown-screen', 'landing', teardown);
+                            _subscribe_once('teardown-screen', 'landing', teardown);
                         
                         // bind enter key 
                             window.addEventListener('keydown', enterHandler);
@@ -93,9 +99,6 @@
 
                         //unbind button
                             startBtn.removeEventListener('click', gotoNextScreen);
-                        
-                        // stop listening to teardown
-                            _unsubscribe('teardown-screen', 'landing');
                     }
 
                     function enterHandler(e){
@@ -113,17 +116,16 @@
                     /* SETUP */
 
                         // req vars
-                        var addProductsBtn = document.getElementById('start-add-product'),
-                            contextSettingsMenu = document.getElementById('context-settings'),
-                            cancelTaskBtn = "<div id='cancel-task' class='setting'>cancel task</div>";
+                        var addProductsBtn = document.getElementById('start-add-product');
                     
                         // prep for teardown
-                            _subscribe('teardown-screen', 'tasks', teardown);
+                            _subscribe_once('teardown-screen', 'tasks', teardown);
 
                     /* ENABLE TASK LINKS */
 
                         // add product
                             addProductsBtn.addEventListener("click", addProductsWorkflow);
+
 
 
                     function addProductsWorkflow(){
@@ -134,50 +136,184 @@
                         // progress UI
                             gotoNextScreen();
 
-                        // create Cancel Task button                            
-                            contextSettingsMenu.innerHTML += cancelTaskBtn;
+                        // add cancel task btn to HUD
+                            create_cancel_task_btn();
 
-                        // Cancel Task Button Behavior
-                            document.getElementById('cancel-task').addEventListener("click", function(){
+                        // clean up task when it ends
+                            _subscribe_once('task-ended', 'task-teardown', function(){
 
-                                // remove btn
-                                    this.parentNode.removeChild(this);
-                                
-                                // deactivate add product screens 
-                                    removeActiveScreens('add-product');
-                                
-                                // go to the last active screen
-                                    gotoScreen( activeScreens.length - 1 );
-
+                                removeActiveScreens('add-product');
+                                gotoScreen(activeScreens.length - 1);
                             });
                     }
 
                     function teardown(){
-
-                        // stop listening for teardown
-                            _unsubscribe('teardown-screen', 'tasks');
 
                         // disable task links
                             addProductsBtn.removeEventListener("click", addProductsWorkflow);
                     }
                 }
 
-            // add product
-                function setup_add_product_manufacturer(){
+            // add product manufacturer
+                function setup_add_product_metadata(screen){
 
                     /* SETUP */
+
+                        // required vars
+                            var currentScreenInputs = screen.getElementsByTagName('input'),
+                                productNameInput = screen.getElementsByClassName('product-name')[0],
+                                manufacturerNameInput = screen.getElementsByClassName('manufacturer-name')[0],
+                                nextBtn = screen.getElementsByClassName('btn')[0];
+
+                        //  activate next btn
+                            nextBtn.addEventListener("click", nextBtnHandler);
                     
                         // prep for teardown
-                            _subscribe('teardown-screen', 'add-products-1', teardown);
+                            _subscribe_once('teardown-screen', 'add-product-metadata', teardown);
+                            
+                        // reset task global vars
+                            _subscribe_once('task-ended', 'reset-new-product-values', function(){
 
+                                addProductName = null;
+                                addProductManufacturer = null;
+                                addProductAltname = null;
+                            });
+
+
+                    function nextBtnHandler(){
+
+                        // required vars
+                            var missingInput = 0,
+                                totalInputs = currentScreenInputs.length;
+
+                        // mark empty fields
+                            for (var i = totalInputs - 1; i >= 0; i--){
+
+                                if( currentScreenInputs[i].value ){ continue; } 
+                                
+                                missingInput += 1;
+
+                                addClass( currentScreenInputs[i], "attention");
+
+                                currentScreenInputs[i].addEventListener("keydown", confirmValueExists);
+                            }
+
+                        // proceed if nothing is missing
+                            if(missingInput < 1){
+
+                                addProductName = productNameInput.value;
+                                addProductManufacturer = manufacturerNameInput.value;
+                                gotoNextScreen();
+                            }
+                    }
 
                     function teardown(){
 
-                        // stop listening for teardown
-                            _unsubscribe('teardown-screen', 'add-products-1');
+                        // required vars
+                            var totalInputs = currentScreenInputs.length;
+
+                            for (var i = totalInputs - 1; i >= 0; i--) {
+                                
+                                // reset value
+                                    currentScreenInputs[i].value = "";
+
+                                // clear fields with attention
+                                    if( hasClass(currentScreenInputs[i], "attention") ){
+
+                                        removeClass(currentScreenInputs[i], "attention");
+                                    }
+                            }
+
+                        // disable next btn
+                            nextBtn.removeEventListener("click", nextBtnHandler);
                     }
 
+                    function confirmValueExists(e){
 
+                        if(!e.target.value){ return; }
+
+                        removeClass(e.target, "attention");
+                        e.target.removeEventListener("keydown", confirmValueExists);
+                    }
+                }
+
+            // add product manufacturer
+                function setup_add_product_confirmation(screen){
+
+                    // required variables
+                    var manufacturer_name_slots = screen.getElementsByClassName('manufacturer-name'),
+                        product_name_slots = screen.getElementsByClassName('product-name'),
+                        create_product_btn = document.getElementById('submit-add-product');
+
+                    // populate manufacturer name slots
+                        for (var i = manufacturer_name_slots.length - 1; i >= 0; i--) {
+                            
+                            manufacturer_name_slots[i].innerHTML = addProductManufacturer;
+                        }
+
+                    // populate product name slots
+                        for (i = product_name_slots.length - 1; i >= 0; i--) {
+                            
+                            product_name_slots[i].innerHTML = addProductName;
+                        }
+
+                    // Activate Submit Button
+                        create_product_btn.addEventListener("click", add_product_to_db);
+
+                        _subscribe_once("teardown-screen", "add-product-confirmation", function(){
+
+                            // disable finalize button
+                                create_product_btn.removeEventListener("click", add_product_to_db);
+
+                            // wipe manufacturer name slots
+                                for (var i = manufacturer_name_slots.length - 1; i >= 0; i--) {
+                                    
+                                    manufacturer_name_slots[i].innerHTML = "";
+                                }
+
+                            // wipe product name slots
+                                for (i = product_name_slots.length - 1; i >= 0; i--) {
+                                    
+                                    product_name_slots[i].innerHTML = "";
+                                } 
+                        });
+
+                    function add_product_to_db(){
+
+                        // required vars
+                        var product_metadata = {},
+                            restart_task;
+                            
+                            product_metadata.name = encodeURIComponent( addProductName );
+                            product_metadata.manufacturer = encodeURIComponent( addProductManufacturer );
+
+                        // send to server
+                            HTTP_POST("add-product.php", "product=" + JSON.stringify(product_metadata) );
+
+                        // complete task                            
+                            restart_task = confirm("Done! Add Another Product?");
+                            
+                            _publish('task-ended', 'add-product-btn');
+
+                        // option to restart task
+                        // - using setTimeout to push it to bottom of event stack
+                        //   after all 'task-ended' hooks are fired
+
+                            setTimeout(function(){
+
+                                var do_restart = restart_task;
+                                
+                                return function(){
+                                    
+                                    if(do_restart === true){                                        
+
+                                        addToActiveScreens('add-product');
+                                        create_cancel_task_btn();                                    
+                                        gotoNextScreen();
+                                    }
+                                };     
+                            }(), 100);
+                    }
                 }
 
         /* SCREENS */
@@ -201,7 +337,7 @@
                 function setResizeResponses(){
                     
                     // when window is resized, resize screens
-                        _subscribe( 'window-resized', 'resize-watchdog', setFullscreenHeight );
+                        _subscribe( 'window-resized', 'screen-height-updater', setFullscreenHeight );
 
                     // when screens are resized, scroll to the active one
                         _subscribe( 'screens-resized', 'autoscroller', scrollToActiveScreen );
@@ -234,29 +370,25 @@
                         thisScreenSetupID = thisScreen.id.replace(/\-/g,"_");
 
                     // scroll to screen when setup is complete
-                        _subscribe(
+                        _subscribe_once(
                             'setup-complete', 
                             'scroll_screen_into_view', 
                             function(){ 
                                 
                                 scrollTo( thisScreen.offsetTop );
-
-                                _unsubscribe('setup-complete', 'scroll_screen_into_view'); 
                             }
                         );
 
                     // focal screen tracker
                         addClass( thisScreen, "focal" );
                         
-                        _subscribe(
+                        _subscribe_once(
 
                             'teardown-screen',
                             'defocalizer',
                             function(){
 
                                 removeClass(thisScreen, 'focal');
-
-                                _unsubscribe('teardown-screen', 'defocalizer');
                             }
                         );
 
@@ -373,14 +505,10 @@
                         intervals.heartbeat = setInterval( network.check, 1000 * 7.5);
 
                     // stop heartbeat on disconnect from the internet
-                        _subscribe(
+                        _subscribe_once(
                             "network-down",
                             "heartbeat",
-                            function(){
-
-                                stopHeartbeat();
-                                _unsubscribe("network-down", "heartbeat");                                
-                            },
+                            stopHeartbeat,
                             null
                         );
                 }
@@ -409,14 +537,13 @@
                         }, 2000);
 
                     // Stop Flickering on Reconnect Exit
-                        _subscribe(
+                        _subscribe_once(
 
                             'network-reconnecting-exit', 
                             'light-flicker',
                             function(){
 
                                 clearInterval( intervals.checkingLightFlickerInterval );
-                                _unsubscribe('network-reconnecting-exit', 'light-flicker');
                             },
                             null
                         );
@@ -516,6 +643,23 @@
 
         /* UTILS */
 
+            // subscribe once
+                function subscribe_once(notification, subscriber, response, responseParams){
+
+                    _subscribe(
+                        notification, 
+                        subscriber,
+
+                        function(){
+
+                            response();
+                            _unsubscribe(notification,subscriber);
+                        },
+
+                        responseParams
+                    );
+                }
+
             // scroll to 
                var scrollTo = (function(){
 
@@ -591,12 +735,72 @@
                     }
                 }
 
+            // XMLHTTP POST
+                function HTTP_POST(url, msg, success, fail){
+
+                // filter
+                    if (!url){ return false; }
+
+                // reqs
+                var server_trip = new XMLHttpRequest();
+                    
+                    msg = msg || "";
+                    success = success || function(response){ console.log("POST TO " + url + " SUCCESSFUL! \nRESPONSE: "); console.log(response); };
+                    fail = fail || function(response){ console.log("POST TO " + url + " UNSUCCESSFUL. \nXMLHTTP OBJECT:"); console.log(response); };
+
+                // prep POST
+                    server_trip.open('POST', url, true);
+                    server_trip.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+                    server_trip.onreadystatechange = function(){
+
+                        // filter uncompleted responses
+                            if (server_trip.readyState !=4){ return; }
+
+                        // success
+                            if ( server_trip.status > 199 && server_trip.status < 400 ){ success(server_trip.responseText); }
+
+                        // fail
+                            else{ fail(server_trip); }                      
+                    };
+
+                // POST
+                    server_trip.send(msg);
+
+                return true;    
+            }
+
+            function create_cancel_task_btn(){
+
+                var contextSettingsMenu = document.getElementById('context-settings'),
+                    cancelTaskBtnMarkup = "<div id='cancel-task' class='setting'>cancel task</div>";
+
+
+                // create Cancel Task button                            
+                    contextSettingsMenu.innerHTML += cancelTaskBtnMarkup;
+
+                // remove btn when task ends
+                    _subscribe_once("task-ended", "remove-cancel-task-btn", 
+
+                        function(){
+
+                            var cancel_task_btn = document.getElementById('cancel-task');
+
+                            cancel_task_btn.parentNode.removeChild(cancel_task_btn);
+                        }
+                    );
+
+                // 
+                    document.getElementById('cancel-task').addEventListener("click", function(){
+
+                        _publish("task-ended", "cancel-task-btn");
+                    });
+            }
+
 
     // LAUNCH APP WHEN DOM IS READY
         document.addEventListener("DOMContentLoaded", function(){ 
 
-            window.goto = gotoScreen;
-            
             init();
+            ASE = activeScreens;
         });
 }());

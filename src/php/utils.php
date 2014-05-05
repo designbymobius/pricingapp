@@ -14,6 +14,11 @@
 	define ("DB_HOST", '<%= env_db_credentials.host %>');	
 	define ("DB_NAME", '<%= env_db_credentials.database %>');
 
+	define ("DB_PRODUCT_TABLE", 'product');
+	define ("DB_PRODUCT_ALTNAME_TABLE", 'altname');
+	define ("DB_PRODUCT_MANUFACTURER_TABLE", 'manufacturer');
+
+
 # -----------------------------------------------
 # DATABASE
 
@@ -33,6 +38,142 @@
 			}
 		}
 
+	// add product to database		
+		function add_product($name, $manufacturer){
+
+			// req vars
+				$response = array();
+				$response['success'] = false;
+
+			// filter missing params
+				if (!$name){ 
+
+					$response['msg'] = "NO PRODUCT NAME TO STORE";
+					return $response; 
+				}
+
+				else if (!$manufacturer){ 
+
+					$response['msg'] = "PRODUCT MANUFACTURER IS MISSING";
+					return $response; 
+				}
+
+			// filter products already in db
+				$duplicate_product_check_querystring = "SELECT `Id` FROM `" . DB_PRODUCT_TABLE . "` WHERE `Name` = '" . $name . "' LIMIT 1";
+				$duplicate_product_check_query = mysql_query($duplicate_product_check_querystring);
+
+				if( mysql_num_rows($duplicate_product_check_query) > 0 ){
+
+					$response['msg'] = "'" . $name . "' ALREADY EXISTS IN DATABASE (PRODUCT)";
+					return $response;
+				}
+
+				$duplicate_altname_check_querystring = "SELECT `ProductId` FROM `" . DB_PRODUCT_ALTNAME_TABLE . "` WHERE `AltName` = '" . $name . "' LIMIT 1";
+				$duplicate_altname_check_query = mysql_query($duplicate_altname_check_querystring);
+
+				if( mysql_num_rows($duplicate_altname_check_query) > 0 ){
+					
+					$response['msg'] = "'" . $name . "' ALREADY EXISTS IN DATABASE (ALTNAME)";
+					return $response;
+				}
+
+			// get manufacturer id
+				$manufacturer_id;
+				$get_manufacturer_id_querystring = "SELECT `Id` FROM `" . DB_PRODUCT_MANUFACTURER_TABLE . "` WHERE `Name` = '" . $manufacturer . "' LIMIT 1";
+				$get_manufacturer_id_query = mysql_query($get_manufacturer_id_querystring);
+
+				if (!$get_manufacturer_id_query) {
+				    
+				    $response['msg'] = "Could not successfully run query ($sql) from DB: " . mysql_error();
+				    return $response;
+				}
+
+				else if(mysql_num_rows($get_manufacturer_id_query) == 0){
+
+					$store_manufacturer = add_manufacturer( $manufacturer );
+
+					if($store_manufacturer['success'] == false){
+
+						$response['msg'] = "COULD NOT RETRIEVE OR STORE MANUFACTURER";
+						return $response;
+					}
+
+					$check_for_manufacturer_query = mysql_query($get_manufacturer_id_querystring);
+
+					while ($check_result = mysql_fetch_assoc($check_for_manufacturer_query)){
+					
+						$manufacturer_id = $check_result["Id"];
+					}
+				} 
+
+				else {
+
+					while( $result = mysql_fetch_assoc($get_manufacturer_id_query) ){
+
+						$manufacturer_id = $result["Id"];
+					}
+				}
+
+			// mysql query
+				$add_product_querystring = "INSERT INTO `" . DB_PRODUCT_TABLE . "` (`Name`, `ManufacturerId`) VALUES ('" . $name . "', '" . $manufacturer_id . "')";
+				$result = mysql_query($add_product_querystring);
+
+			// set response
+				if(!$result){
+
+					$response['msg'] = mysql_error();
+				}
+
+				else {
+
+					$response['success'] = true;
+					$response['msg'] = "'" . $name . "' ADDED TO PRODUCT DATABASE";
+				}
+			
+			return $response;
+		}
+
+	// add manufacturer to db
+		function add_manufacturer($name){
+
+			// req vars
+				$response = array();
+				$response['success'] = false;
+
+			// filter missing reqs
+				if(!$name){  
+
+					$response['msg'] = "MANUFACTURER NAME NOT GIVEN";
+					return $response;
+				}
+
+			// filter duplicate manufacturer entries
+				$duplicate_manufacturer_querystring = "SELECT `Id` FROM `" . DB_PRODUCT_MANUFACTURER_TABLE . "` WHERE `Name` = '" . $name . "' LIMIT 1";
+				$duplicate_manufacturer_query = mysql_query($duplicate_manufacturer_querystring);
+
+				if (!$duplicate_manufacturer_query) {
+				    
+				    $response['msg'] = "Could not successfully run query ($sql) from DB: " . mysql_error();
+				}
+
+				else if( mysql_num_rows($duplicate_manufacturer_query) > 0 ){
+
+					$response['msg'] = "MANUFACTURER '" . $name . "' IS ALREADY IN THE DATABASE";
+				} 
+
+				else {
+
+					// mysql add manufacturer
+						$add_manufacturer_querystring = "INSERT INTO `" . DB_PRODUCT_MANUFACTURER_TABLE . "` (`Name`) VALUES ('" . $name . "')";
+						$add_manufacturer_query = mysql_query($add_manufacturer_querystring);
+
+						$response['success'] = true;
+						$response['msg'] = "MANUFACTURER '" . $name . "' ADDED";					
+				}
+
+				return $response;
+		}
+
 	// create a database
 		function create_db($db_name, $options = null){
 
@@ -50,13 +191,12 @@
 
 			// required vars
 				$response = array();
+				$response['success'] = false;
 
 			// filter existing tables
 				if(table_exists( $table_name )){ 
 
-					$response['success'] = false;
-					$response['msg'] = "TABLE '" . $table_name . "' ALREADY EXISTS IN '" . $db_name . "' DB";
-					
+					$response['msg'] = "TABLE '" . $table_name . "' ALREADY EXISTS IN '" . $db_name . "' DB";					
 					return $response;
 				}
 
@@ -71,7 +211,6 @@
 			// prep response
 				if (!$query){ 
 
-					$response['success'] = false;
 					$response['msg'] = "TABLE '" . $table_name . "' CREATION QUERY FAILED";
 				}
 

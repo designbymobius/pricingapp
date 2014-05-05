@@ -246,37 +246,53 @@ html, body {
 		color: red;
 	}
 
-#task-list {
+/* Task List */
+	#task-list {
 
-	list-style-type: none;
-	float: left;
+		list-style-type: none;
+		float: left;
 
-	font-size: 1.25em;
-	margin-top: 1.5em;
-	padding: 0;
-}
+		font-size: 1.25em;
+		margin-top: 1.5em;
+		padding: 0;
+	}
 
-#task-list li {
+	#task-list li {
 
-	padding: 0.5em 3.5em 0.5em 1.5em;
-	border-bottom: 1px solid #ddd;
-	font-weight: 900;
-	color: #1087bc;
+		padding: 0.5em 3.5em 0.5em 1.5em;
+		border-bottom: 1px solid #ddd;
+		font-weight: 900;
+		color: #1087bc;
 
-	cursor: pointer;
-}
+		cursor: pointer;
+	}
 
-#task-list li:hover {
+	#task-list li:hover {
 
-	background-color: #e0f3fc;
-}
+		background-color: #e0f3fc;
+	}
 
-#task-list li:active {
+	#task-list li:active {
 
-	color: #0b5a7d;
-}
+		color: #0b5a7d;
+	}
 
-#task-list a {
+	#task-list a {
 
-	text-decoration: none;
-}
+		text-decoration: none;
+	}
+
+/* Add Products */
+	.add-product.focal input.attention {
+
+		border-color: red;
+		color: red;
+	}
+
+	.add-product #product-metadata{
+
+		font-weight: 900;
+		line-height: 2em;
+		font-size: 2.25em;
+		text-transform: uppercase;
+	}
