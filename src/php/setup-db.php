@@ -5,8 +5,8 @@
 
 	// required vars
 		$product_table = DB_PRODUCT_TABLE;
-		$product_altname_table = DB_PRODUCT_ALTNAME_TABLE;
-		$product_manufacturer_table = DB_PRODUCT_MANUFACTURER_TABLE;
+		$product_alias_table = DB_PRODUCT_ALIAS_TABLE;
+		$product_manufacturer_table = DB_MANUFACTURER_TABLE;
 
 	// check for database 
 	// @: create if necessary 
@@ -26,23 +26,25 @@
 			"(
 				Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,					
 				Name varchar(250) NOT NULL,
-				ManufacturerId varchar(250) NOT NULL
+				ManufacturerId varchar(250) NOT NULL,
+				DisplayAliasId varchar(250)
 			)"
 		);
 
 		echo $create_product_table["msg"] . "<br />";
 		
-	// altname table
-		$create_altname_table = create_table( 
+	// product alias table
+		$create_alias_table = create_table( 
 			
-			$product_altname_table, 
+			$product_alias_table, 
 			"(
+				Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,					
 				ProductId varchar(250) NOT NULL,					
-				AltName varchar(250) NOT NULL
+				Alias varchar(250) NOT NULL
 			)"
 		);
 
-		echo $create_altname_table["msg"] . "<br />";
+		echo $create_alias_table["msg"] . "<br />";
 		
 	// manufacturer table
 		$create_manufacturer_table = create_table( 

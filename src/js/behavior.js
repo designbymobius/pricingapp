@@ -127,26 +127,6 @@
                             addProductsBtn.addEventListener("click", addProductsWorkflow);
 
 
-
-                    function addProductsWorkflow(){
-
-                        // activate add product screens 
-                            addToActiveScreens('add-product');
-                        
-                        // progress UI
-                            gotoNextScreen();
-
-                        // add cancel task btn to HUD
-                            create_cancel_task_btn();
-
-                        // clean up task when it ends
-                            _subscribe_once('task-ended', 'task-teardown', function(){
-
-                                removeActiveScreens('add-product');
-                                gotoScreen(activeScreens.length - 1);
-                            });
-                    }
-
                     function teardown(){
 
                         // disable task links
@@ -290,29 +270,23 @@
                         // send to server
                             HTTP_POST("add-product.php", "product=" + JSON.stringify(product_metadata) );
 
-                        // complete task                            
-                            restart_task = confirm("Done! Add Another Product?");
+                        // restart task dialog
+                            _subscribe_once(
+                                "setup-complete",
+                                "restart-task-dialog",
+                                function(){
                             
-                            _publish('task-ended', 'add-product-btn');
-
-                        // option to restart task
-                        // - using setTimeout to push it to bottom of event stack
-                        //   after all 'task-ended' hooks are fired
-
-                            setTimeout(function(){
-
-                                var do_restart = restart_task;
-                                
-                                return function(){
+                                    restart_task = confirm("Done! Add Another Product?");                            
                                     
-                                    if(do_restart === true){                                        
+                                    if(restart_task === true){                                        
 
-                                        addToActiveScreens('add-product');
-                                        create_cancel_task_btn();                                    
-                                        gotoNextScreen();
+                                        addProductsWorkflow();
                                     }
-                                };     
-                            }(), 100);
+                                }     
+                            );
+
+                        // complete task
+                            _publish('task-ended', null, 'add-product-btn');
                     }
                 }
 
@@ -769,6 +743,26 @@
                 return true;    
             }
 
+
+            function addProductsWorkflow(){
+
+                // activate add product screens 
+                    addToActiveScreens('add-product');
+                
+                // progress UI
+                    gotoNextScreen();
+
+                // add cancel task btn to HUD
+                    create_cancel_task_btn();
+
+                // clean up task when it ends
+                    _subscribe_once('task-ended', 'task-teardown', function(){
+
+                        removeActiveScreens('add-product');
+                        gotoScreen(activeScreens.length - 1);
+                    });
+            }
+
             function create_cancel_task_btn(){
 
                 var contextSettingsMenu = document.getElementById('context-settings'),
@@ -789,13 +783,58 @@
                         }
                     );
 
-                // 
+                // set behavior
                     document.getElementById('cancel-task').addEventListener("click", function(){
 
                         _publish("task-ended", "cancel-task-btn");
                     });
-            }
+            }            
+            
+            pubsub.log.crawl = function(key){
 
+                var results = "";
+
+                for(var i = 0; i < pubsub.log.length - 1; i += 1){ 
+
+                if( 
+                    (
+                        (typeof key == 'string' || key instanceof String) && (   
+                            ((typeof pubsub.log[i].publisher == 'string' || pubsub.log[i].publisher instanceof String) && pubsub.log[i].publisher.toLowerCase() == key.toLowerCase()) ||  ((typeof pubsub.log[i].subscriber == 'string' || pubsub.log[i].subscriber instanceof String) && pubsub.log[i].subscriber.toLowerCase() == key.toLowerCase()) ||  ((typeof pubsub.log[i].unsubscriber == 'string' || pubsub.log[i].unsubscriber instanceof String) && pubsub.log[i].unsubscriber.toLowerCase() == key.toLowerCase()) ||  ((typeof pubsub.log[i].type == 'string' || pubsub.log[i].type instanceof String)  && pubsub.log[i].type.toLowerCase() == key.toLowerCase()) ||  ((typeof pubsub.log[i].notification == 'string' || pubsub.log[i].notification instanceof String) && pubsub.log[i].notification.toLowerCase() == key.toLowerCase()) 
+                        )
+                    ) || (key === null && pubsub.log[i].publisher) 
+                ){ 
+
+                    results += "\n\n-[" + i + "]-\n[" +  ( pubsub.log[i].subscriber || pubsub.log[i].publisher || pubsub.log[i].unsubscriber ) + "] " + pubsub.log[i].type + " " + pubsub.log[i].notification;
+                }
+                }
+
+                console.log(results);
+            };
+
+            pubsub.log.range = function(a,b){
+
+                var results = "",
+                    start,
+                    end;
+
+                start = a > b ? b : a;
+                end = a > b ? a : b;
+
+
+                if(start < 0 || end > pubsub.log.length - 1){
+
+                    return console.log("wtf bro");
+                }
+
+                console.log("crawling " + start + " to " + end);
+
+                for(var i = start; i <= end; i += 1){
+
+                    results += "\n\n-[" + i + "]-\n[" +  ( pubsub.log[i].subscriber || pubsub.log[i].publisher || pubsub.log[i].unsubscriber ) + "] " + pubsub.log[i].type + " " + pubsub.log[i].notification;
+                }
+
+                console.log(results);
+            };
 
     // LAUNCH APP WHEN DOM IS READY
         document.addEventListener("DOMContentLoaded", function(){ 

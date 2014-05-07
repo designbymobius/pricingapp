@@ -15,8 +15,8 @@
 	define ("DB_NAME", '<%= env_db_credentials.database %>');
 
 	define ("DB_PRODUCT_TABLE", 'product');
-	define ("DB_PRODUCT_ALTNAME_TABLE", 'altname');
-	define ("DB_PRODUCT_MANUFACTURER_TABLE", 'manufacturer');
+	define ("DB_MANUFACTURER_TABLE", 'manufacturer');
+	define ("DB_PRODUCT_ALIAS_TABLE", 'product_alias');
 
 
 # -----------------------------------------------
@@ -27,15 +27,9 @@
 
 			$connect = mysql_connect(DB_HOST, DB_USER, DB_PASSWORD);
 
-			if (!$connect){ 
+			if(!$connect){ die("COULDN'T CONNECT TO DB"); } 
 
-				die ("COULDN'T CONNECT TO DB");
-			} 
-
-			else {
-
-				return $connect;
-			}
+			else{ return $connect; }
 		}
 
 	// add product to database		
@@ -68,27 +62,12 @@
 					return $response;
 				}
 
-				$duplicate_altname_check_querystring = "SELECT `ProductId` FROM `" . DB_PRODUCT_ALTNAME_TABLE . "` WHERE `AltName` = '" . $name . "' LIMIT 1";
-				$duplicate_altname_check_query = mysql_query($duplicate_altname_check_querystring);
-
-				if( mysql_num_rows($duplicate_altname_check_query) > 0 ){
-					
-					$response['msg'] = "'" . $name . "' ALREADY EXISTS IN DATABASE (ALTNAME)";
-					return $response;
-				}
-
 			// get manufacturer id
 				$manufacturer_id;
-				$get_manufacturer_id_querystring = "SELECT `Id` FROM `" . DB_PRODUCT_MANUFACTURER_TABLE . "` WHERE `Name` = '" . $manufacturer . "' LIMIT 1";
+				$get_manufacturer_id_querystring = "SELECT `Id` FROM `" . DB_MANUFACTURER_TABLE . "` WHERE `Name` = '" . $manufacturer . "' LIMIT 1";
 				$get_manufacturer_id_query = mysql_query($get_manufacturer_id_querystring);
 
-				if (!$get_manufacturer_id_query) {
-				    
-				    $response['msg'] = "Could not successfully run query ($sql) from DB: " . mysql_error();
-				    return $response;
-				}
-
-				else if(mysql_num_rows($get_manufacturer_id_query) == 0){
+				if( mysql_num_rows($get_manufacturer_id_query) == 0 ){
 
 					$store_manufacturer = add_manufacturer( $manufacturer );
 
@@ -116,19 +95,23 @@
 
 			// mysql query
 				$add_product_querystring = "INSERT INTO `" . DB_PRODUCT_TABLE . "` (`Name`, `ManufacturerId`) VALUES ('" . $name . "', '" . $manufacturer_id . "')";
-				$result = mysql_query($add_product_querystring);
+				$add_product_query = mysql_query($add_product_querystring);
 
 			// set response
-				if(!$result){
+				if(!$add_product_query){
 
 					$response['msg'] = mysql_error();
 				}
-
-				else {
-
 					$response['success'] = true;
 					$response['msg'] = "'" . $name . "' ADDED TO PRODUCT DATABASE";
-				}
+					$response['product_id'] = mysql_insert_id();
+
+			// save product alias
+				add_alias($name, $response['product_id']);
+
+			// set product display alias
+				$set_product_alias_querystring = "UPDATE `" . DB_PRODUCT_TABLE . "` SET `DisplayAliasId` = '" . mysql_insert_id() . "' WHERE `Id` = " . $response['product_id'];
+				$set_product_alias_query = mysql_query($set_product_alias_querystring);
 			
 			return $response;
 		}
@@ -148,28 +131,51 @@
 				}
 
 			// filter duplicate manufacturer entries
-				$duplicate_manufacturer_querystring = "SELECT `Id` FROM `" . DB_PRODUCT_MANUFACTURER_TABLE . "` WHERE `Name` = '" . $name . "' LIMIT 1";
+				$duplicate_manufacturer_querystring = "SELECT `Id` FROM `" . DB_MANUFACTURER_TABLE . "` WHERE `Name` = '" . $name . "' LIMIT 1";
 				$duplicate_manufacturer_query = mysql_query($duplicate_manufacturer_querystring);
 
-				if (!$duplicate_manufacturer_query) {
-				    
-				    $response['msg'] = "Could not successfully run query ($sql) from DB: " . mysql_error();
-				}
-
-				else if( mysql_num_rows($duplicate_manufacturer_query) > 0 ){
+				if( mysql_num_rows($duplicate_manufacturer_query) > 0 ){
 
 					$response['msg'] = "MANUFACTURER '" . $name . "' IS ALREADY IN THE DATABASE";
-				} 
-
-				else {
-
-					// mysql add manufacturer
-						$add_manufacturer_querystring = "INSERT INTO `" . DB_PRODUCT_MANUFACTURER_TABLE . "` (`Name`) VALUES ('" . $name . "')";
-						$add_manufacturer_query = mysql_query($add_manufacturer_querystring);
-
-						$response['success'] = true;
-						$response['msg'] = "MANUFACTURER '" . $name . "' ADDED";					
+					return $response;
 				}
+
+			// mysql add manufacturer
+				$add_manufacturer_querystring = "INSERT INTO `" . DB_MANUFACTURER_TABLE . "` (`Name`) VALUES ('" . $name . "')";
+				$add_manufacturer_query = mysql_query($add_manufacturer_querystring);
+
+				$response['success'] = true;
+				$response['msg'] = "MANUFACTURER '" . $name . "' ADDED";		
+
+				return $response;
+		}
+
+	// add alias to db
+		function add_alias($alias, $product_id){
+
+			// req vars
+				$response = array();
+				$response['success'] = false;
+
+			// filter missing reqs
+				if(!$alias){  
+
+					$response['msg'] = "NO PRODUCT ALIAS RECEIVED";
+					return $response;
+				}
+
+				if(!$product_id){  
+
+					$response['msg'] = "NO PRODUCT ID RECEIVED";
+					return $response;
+				}
+		
+			// mysql add alias
+				$add_alias_querystring = "INSERT INTO `" . DB_PRODUCT_ALIAS_TABLE . "` (`Alias`, `ProductId`) VALUES ('" . $alias . "', '" . $product_id . "')";
+				$add_alias_query = mysql_query($add_alias_querystring);
+
+				$response['success'] = true;
+				$response['msg'] = "ALIAS '" . $alias . "' ADDED FOR PRODUCT " . $product_id;
 
 				return $response;
 		}
@@ -228,7 +234,6 @@
 
 	// Get sha1 value of string 
 		function get_hashsum($string){
-
 			
 			$clean_string = utf8_encode($string);
 			$hashsum = sha1($clean_string);
@@ -239,15 +244,13 @@
 	// Check if database exists
 		function db_exists($db_name, $connection = null){
 
-			$connection = ($connection ? $connection : db_server_connect());
+			$connection = $connection !== null ? $connection : db_server_connect();
 
 			return mysql_select_db($db_name, $connection);				
 		}
 
 	// Check if table exists
-		function table_exists($table_name, $db_name = null){
-
-			$db_name = ($db_name ? $db_name : DB_NAME);
+		function table_exists($table_name, $db_name = DB_NAME){
 
 			mysql_select_db( $db_name );
 
