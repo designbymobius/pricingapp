@@ -28,6 +28,7 @@
         screen_setup.tasks = setup_tasks;
         screen_setup.add_product_metadata = setup_add_product_metadata;
         screen_setup.add_product_confirmation = setup_add_product_confirmation;
+        screen_setup.view_product_list = setup_view_product_list;
 
     // internal functions
 
@@ -116,12 +117,16 @@
                     /* SETUP */
 
                         // req vars
-                        var addProductsBtn = document.getElementById('start-add-product');
+                        var addProductsBtn = document.getElementById('start-add-product'),
+                            viewProductsBtn = document.getElementById('start-view-products');
                     
                         // prep for teardown
                             _subscribe_once('teardown-screen', 'tasks', teardown);
 
                     /* ENABLE TASK LINKS */
+
+                        // view products
+                            viewProductsBtn.addEventListener("click", viewProductsWorkflow);
 
                         // add product
                             addProductsBtn.addEventListener("click", addProductsWorkflow);
@@ -131,6 +136,7 @@
 
                         // disable task links
                             addProductsBtn.removeEventListener("click", addProductsWorkflow);
+                            viewProductsBtn.removeEventListener("click", viewProductsWorkflow);
                     }
                 }
 
@@ -217,7 +223,7 @@
                     }
                 }
 
-            // add product manufacturer
+            // add product confirmation
                 function setup_add_product_confirmation(screen){
 
                     // required variables
@@ -261,8 +267,7 @@
                     function add_product_to_db(){
 
                         // required vars
-                        var product_metadata = {},
-                            restart_task;
+                        var product_metadata = {};
                             
                             product_metadata.name = encodeURIComponent( addProductName );
                             product_metadata.manufacturer = encodeURIComponent( addProductManufacturer );
@@ -276,7 +281,7 @@
                                 "restart-task-dialog",
                                 function(){
                             
-                                    restart_task = confirm("Done! Add Another Product?");                            
+                                    var restart_task = confirm("Done! Add Another Product?");                            
                                     
                                     if(restart_task === true){                                        
 
@@ -287,6 +292,71 @@
 
                         // complete task
                             _publish('task-ended', null, 'add-product-btn');
+                    }
+                }
+
+            // view product list
+                function setup_view_product_list(screen){
+
+                    var appStorage = new Persist.Store('Pricing App Storage',{
+
+                        about: "Data Storage to enhance Offline usage",
+                        path: location.href
+                    });
+
+                    appStorage.get("product", function(ok, value){
+
+                        if(!value){
+
+                            // get product db via ajax
+                                HTTP_POST(
+                                    "get-product.php", 
+                                    null,
+                                    function(response){
+
+                                        // store received responses
+                                            appStorage.set("product", response);
+                                            render_product_list();
+                                    }
+                                );
+                        }
+
+                        else {
+
+                            render_product_list();
+                        }
+                    });
+
+                    function render_product_list(){
+
+                        var get_product_db;
+
+                        _subscribe(
+                            "product-list-loaded",
+                            "render-product-list",
+                            function(data){
+
+                                var list_wrapper = document.getElementById('product-list'),
+                                    product_db = JSON.parse(data.notificationParams),
+                                    product_db_length = product_db.length,
+                                    markup = "";
+
+                                for (var i = product_db_length; i >= 1; i--) {
+                                    
+                                    markup += "<div class='product'> <div class='name'>" + product_db[ product_db_length - i ].Name + "</div></div>";
+                                }
+
+                                list_wrapper.innerHTML = markup;                         
+                            }
+                        );
+
+                        get_product_db = appStorage.get("product", function(ok,val){
+
+                            if(ok){
+
+                                _publish("product-list-loaded", val, "render-product-list"); 
+                            }
+                        });
                     }
                 }
 
@@ -419,12 +489,12 @@
 
                     var change_tally = 0;
 
-                    for (var i = allScreens.length - 1; i >= 0; i--){
+                    for (var i = activeScreens.length - 1; i >= 0; i--){
                         
-                        if( hasClass(allScreens[i], screenClass) ){
+                        if( hasClass(activeScreens[i], screenClass) ){
 
                             // remove active class
-                                removeClass(allScreens[i], 'active');
+                                removeClass(activeScreens[i], 'active');
 
                             // remove from active screens list
                                 activeScreens.splice(i, 1);
@@ -712,36 +782,36 @@
             // XMLHTTP POST
                 function HTTP_POST(url, msg, success, fail){
 
-                // filter
-                    if (!url){ return false; }
+                    // filter
+                        if (!url){ return false; }
 
-                // reqs
-                var server_trip = new XMLHttpRequest();
-                    
-                    msg = msg || "";
-                    success = success || function(response){ console.log("POST TO " + url + " SUCCESSFUL! \nRESPONSE: "); console.log(response); };
-                    fail = fail || function(response){ console.log("POST TO " + url + " UNSUCCESSFUL. \nXMLHTTP OBJECT:"); console.log(response); };
+                    // reqs
+                    var server_trip = new XMLHttpRequest();
+                        
+                        msg = msg || "";
+                        success = success || function(response){ console.log("POST TO " + url + " SUCCESSFUL! \nRESPONSE: "); console.log(response); };
+                        fail = fail || function(response){ console.log("POST TO " + url + " UNSUCCESSFUL. \nXMLHTTP OBJECT:"); console.log(response); };
 
-                // prep POST
-                    server_trip.open('POST', url, true);
-                    server_trip.setRequestHeader("Content-type","application/x-www-form-urlencoded");
-                    server_trip.onreadystatechange = function(){
+                    // prep POST
+                        server_trip.open('POST', url, true);
+                        server_trip.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+                        server_trip.onreadystatechange = function(){
 
-                        // filter uncompleted responses
-                            if (server_trip.readyState !=4){ return; }
+                            // filter uncompleted responses
+                                if (server_trip.readyState !=4){ return; }
 
-                        // success
-                            if ( server_trip.status > 199 && server_trip.status < 400 ){ success(server_trip.responseText); }
+                            // success
+                                if ( server_trip.status > 199 && server_trip.status < 400 ){ success(server_trip.responseText); }
 
-                        // fail
-                            else{ fail(server_trip); }                      
-                    };
+                            // fail
+                                else{ fail(server_trip); }                      
+                        };
 
-                // POST
-                    server_trip.send(msg);
+                    // POST
+                        server_trip.send(msg);
 
-                return true;    
-            }
+                    return true;    
+                }
 
 
             function addProductsWorkflow(){
@@ -763,11 +833,29 @@
                     });
             }
 
+            function viewProductsWorkflow(){
+
+                // activate add product screens 
+                    addToActiveScreens('view-product');
+                
+                // progress UI
+                    gotoNextScreen();
+
+                // add cancel task btn to HUD
+                    create_cancel_task_btn();
+
+                // clean up task when it ends
+                    _subscribe_once('task-ended', 'task-teardown', function(){
+
+                        removeActiveScreens('view-product');
+                        gotoScreen(activeScreens.length - 1);
+                    });
+            }
+
             function create_cancel_task_btn(){
 
                 var contextSettingsMenu = document.getElementById('context-settings'),
                     cancelTaskBtnMarkup = "<div id='cancel-task' class='setting'>cancel task</div>";
-
 
                 // create Cancel Task button                            
                     contextSettingsMenu.innerHTML += cancelTaskBtnMarkup;
