@@ -298,11 +298,18 @@
             // view product list
                 function setup_view_product_list(screen){
 
-                    var appStorage = new Persist.Store('Pricing App Storage',{
+                    var list_wrapper = document.getElementById('product-list'),
+                        appStorage = new Persist.Store('Pricing App Storage',{
 
                         about: "Data Storage to enhance Offline usage",
                         path: location.href
                     });
+
+                    _subscribe_once("teardown-screen", "teardown", teardown);
+
+                    _subscribe("screens-resized", "resize-list-wrapper", resize_list_wrapper);
+
+                    resize_list_wrapper();
 
                     appStorage.get("product", function(ok, value){
 
@@ -316,47 +323,39 @@
 
                                         // store received responses
                                             appStorage.set("product", response);
-                                            render_product_list();
+                                            render_product_list(response);
                                     }
                                 );
                         }
 
                         else {
 
-                            render_product_list();
+                            render_product_list(value);
                         }
                     });
 
-                    function render_product_list(){
+                    function teardown(){
 
-                        var get_product_db;
+                        _unsubscribe("screens-resized", "resize-list-wrapper");
+                    }
 
-                        _subscribe(
-                            "product-list-loaded",
-                            "render-product-list",
-                            function(data){
+                    function resize_list_wrapper(){
 
-                                var list_wrapper = document.getElementById('product-list'),
-                                    product_db = JSON.parse(data.notificationParams),
-                                    product_db_length = product_db.length,
-                                    markup = "";
+                        list_wrapper.style.height = (screen.offsetHeight * 0.7) + "px";
+                    }
 
-                                for (var i = product_db_length; i >= 1; i--) {
-                                    
-                                    markup += "<div class='product'> <div class='name'>" + product_db[ product_db_length - i ].Name + "</div></div>";
-                                }
+                    function render_product_list( product_db_json ){
 
-                                list_wrapper.innerHTML = markup;                         
-                            }
-                        );
+                        var product_db = JSON.parse( product_db_json ),
+                            product_db_length = product_db.length,
+                            markup = "";
 
-                        get_product_db = appStorage.get("product", function(ok,val){
+                        for (var i = product_db_length; i >= 1; i--) {
+                            
+                            markup += "<div class='product'> <div class='name'>" + product_db[ product_db_length - i ].Name + "</div></div>";
+                        }
 
-                            if(ok){
-
-                                _publish("product-list-loaded", val, "render-product-list"); 
-                            }
-                        });
+                        list_wrapper.innerHTML = markup;                         
                     }
                 }
 
@@ -390,11 +389,17 @@
             // set active screens heights
                 function setFullscreenHeight(){
 
+                    var padding_top,
+                        padding_bottom;
+
                     for (var i = activeScreens.length - 1; i >= 0; i--) {
 
                         if (i < activeScreenIndex) { break; }
+
+                        padding_top = document.defaultView.getComputedStyle(activeScreens[i],null).getPropertyValue('padding-top').replace("px", "");
+                        padding_bottom = document.defaultView.getComputedStyle(activeScreens[i],null).getPropertyValue('padding-bottom').replace("px", "");
                         
-                        activeScreens[i].style.height = window.innerHeight + "px"; 
+                        activeScreens[i].style.height = (window.innerHeight - padding_top - padding_bottom ) + "px";
                     }
 
                     _publish('screens-resized', null, this);
@@ -828,8 +833,10 @@
                 // clean up task when it ends
                     _subscribe_once('task-ended', 'task-teardown', function(){
 
-                        removeActiveScreens('add-product');
-                        gotoScreen(activeScreens.length - 1);
+                        gotoScreen(1);
+                        setTimeout(function(){
+                            removeActiveScreens('add-product');
+                        }, 250);
                     });
             }
 
@@ -847,8 +854,10 @@
                 // clean up task when it ends
                     _subscribe_once('task-ended', 'task-teardown', function(){
 
-                        removeActiveScreens('view-product');
-                        gotoScreen(activeScreens.length - 1);
+                        gotoScreen(1);
+                        setTimeout(function(){
+                            removeActiveScreens('view-product');
+                        }, 250);
                     });
             }
 
@@ -928,6 +937,7 @@
         document.addEventListener("DOMContentLoaded", function(){ 
 
             init();
+            goto = gotoScreen;
             ASE = activeScreens;
         });
 }());
