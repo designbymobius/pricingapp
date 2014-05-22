@@ -7,6 +7,7 @@
 		$product_table = DB_PRODUCT_TABLE;
 		$product_alias_table = DB_PRODUCT_ALIAS_TABLE;
 		$product_manufacturer_table = DB_MANUFACTURER_TABLE;
+		$product_price_table = DB_PRODUCT_PRICE_TABLE;
 
 	// check for database 
 	// @: create if necessary 
@@ -27,7 +28,8 @@
 				Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,					
 				Name varchar(250) NOT NULL,
 				ManufacturerId varchar(250) NOT NULL,
-				DisplayAliasId varchar(250)
+				DisplayAliasId varchar(250),
+				Price varchar (250)
 			)"
 		);
 

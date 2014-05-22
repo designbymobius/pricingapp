@@ -17,6 +17,7 @@
 	define ("DB_PRODUCT_TABLE", 'product');
 	define ("DB_MANUFACTURER_TABLE", 'manufacturer');
 	define ("DB_PRODUCT_ALIAS_TABLE", 'product_alias');
+	define ("DB_PRODUCT_PRICE_TABLE", 'price');
 
 
 # -----------------------------------------------

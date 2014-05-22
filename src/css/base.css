@@ -312,3 +312,42 @@ html, body {
 		padding: 1em;
 		line-height: 1.25em;
 	}
+
+	#product-list .product.edit-product {
+
+		background-color: orange;
+	}
+
+	#product-list .product.editted-product {
+
+		background-color: #8f8;
+	}
+
+	#product-list .product > div {
+
+		display: inline-block;
+	}
+
+	#product-list .product .name {
+
+		width: 60%;
+	}
+
+	#product-list .product .price,
+	#product-list .product .settings {
+
+		width: 19%;
+		text-align: right;
+	}
+
+	#product-list .product .settings {
+
+		color: #aaa;
+		font-size: 0.7em;
+		letter-spacing: 0.3em;
+	}
+
+	#product-list .edit-product .settings {
+
+		color: #fff;
+	}

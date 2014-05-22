@@ -135,7 +135,17 @@ module.exports = function(grunt){
 					
 					files: [
 						{ expand: true, flatten: true, src: ['<%= srcDirectory %>/php/*.php'], dest: '<%= buildDirectory %>/'},
-					]
+					],
+
+					options:{
+
+						processContent: function(content, path){
+
+							grunt.config('build-env', 'build');
+
+							return grunt.template.process(content);
+						}
+					}
 				},
 
 				php_prod:{
@@ -182,7 +192,7 @@ module.exports = function(grunt){
 				php: {
 
 					files: '<%= srcDirectory %>/php/*.php',
-					tasks: ['newer:copy:php_debug', 'newer:copy:php_prod','notify:php']
+					tasks: ['newer:copy:php_debug','newer:copy:php_build', 'newer:copy:php_prod','notify:php']
 				},
 
 				index: {

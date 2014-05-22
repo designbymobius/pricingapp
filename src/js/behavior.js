@@ -267,7 +267,8 @@
                     function add_product_to_db(){
 
                         // required vars
-                        var product_metadata = {};
+                        var product_metadata = {},
+                            restart_task;
                             
                             product_metadata.name = encodeURIComponent( addProductName );
                             product_metadata.manufacturer = encodeURIComponent( addProductManufacturer );
@@ -276,19 +277,22 @@
                             HTTP_POST("add-product.php", "product=" + JSON.stringify(product_metadata) );
 
                         // restart task dialog
-                            _subscribe_once(
-                                "setup-complete",
-                                "restart-task-dialog",
-                                function(){
-                            
-                                    var restart_task = confirm("Done! Add Another Product?");                            
-                                    
-                                    if(restart_task === true){                                        
+                            restart_task = confirm("Done! Add Another Product?");                            
+                        
+                            if(restart_task === true){
 
+                                _unsubscribe('task-ended', 'task-teardown');                                        
+                           
+                                _subscribe_once(
+                                    "task-ended",
+                                    "restart-task",
+                                    function(){                                        
+
+                                        removeActiveScreens('add-product');
                                         addProductsWorkflow();
-                                    }
-                                }     
-                            );
+                                    }     
+                                );
+                            }                        
 
                         // complete task
                             _publish('task-ended', null, 'add-product-btn');
@@ -298,12 +302,13 @@
             // view product list
                 function setup_view_product_list(screen){
 
-                    var list_wrapper = document.getElementById('product-list'),
+                    var product_db_json,
+                        list_wrapper = document.getElementById('product-list'),                        
                         appStorage = new Persist.Store('Pricing App Storage',{
 
-                        about: "Data Storage to enhance Offline usage",
-                        path: location.href
-                    });
+                            about: "Data Storage to enhance Offline usage",
+                            path: location.href
+                        });
 
                     _subscribe_once("teardown-screen", "teardown", teardown);
 
@@ -313,30 +318,31 @@
 
                     appStorage.get("product", function(ok, value){
 
-                        if(!value){
+                        if(value){
 
-                            // get product db via ajax
-                                HTTP_POST(
-                                    "get-product.php", 
-                                    null,
-                                    function(response){
-
-                                        // store received responses
-                                            appStorage.set("product", response);
-                                            render_product_list(response);
-                                    }
-                                );
-                        }
-
-                        else {
-
+                            product_db_json = value;
                             render_product_list(value);
                         }
+
+                        update_product_db_on_device();
                     });
+                                     
+                    list_wrapper.addEventListener("click", edit_product);
+
 
                     function teardown(){
 
+                        list_wrapper.removeEventListener("click", edit_product);
+
                         _unsubscribe("screens-resized", "resize-list-wrapper");
+                        
+                        _subscribe_once("setup-complete", "cleanup-product-list", function(){
+                            
+                            setTimeout(function(){
+                                
+                                render_product_list('{}');
+                            }, 150);
+                        });
                     }
 
                     function resize_list_wrapper(){
@@ -350,12 +356,80 @@
                             product_db_length = product_db.length,
                             markup = "";
 
-                        for (var i = product_db_length; i >= 1; i--) {
-                            
-                            markup += "<div class='product'> <div class='name'>" + product_db[ product_db_length - i ].Name + "</div></div>";
+                        if(!product_db_length || product_db_length < 1){
+
+                            markup = "there are no products in the database ...";
+                        } 
+
+                        else {
+
+                            for (var i = product_db_length; i >= 1; i--) {
+                                
+                                markup += "<div class='product' data-product-name='" + product_db[ product_db_length - i ].Name + "' data-product-id='" + product_db[ product_db_length - i ].Id + "'> <div class='name'>" + product_db[ product_db_length - i ].Name + "</div> <div class='price'>" + (product_db[ product_db_length - i ].Price ? "&#8358;" + product_db[ product_db_length - i ].Price : "-----")  + "</div>" + "<div class='settings'>edit</div></div>";
+                            }
                         }
 
-                        list_wrapper.innerHTML = markup;                         
+                        list_wrapper.innerHTML = markup;
+                    }
+                        
+
+                    function edit_product(e){
+
+                        var click_target = e.target,
+                            click_target_id,
+                            set_price_prompt;
+
+                        while( !hasClass(click_target, "settings") ){
+
+                            if( click_target.parentNode == list_wrapper ){ return; }
+                            
+                            click_target = click_target.parentNode;
+                        }
+
+                        click_target = click_target.parentNode;
+
+                        addClass(click_target, "edit-product");
+
+                        click_target_id = click_target.getAttribute('data-product-id');
+
+                        set_price_prompt = prompt("Set Price for '" + click_target.getAttribute('data-product-name').toUpperCase() + "'?");
+
+                        if(set_price_prompt !== null){
+
+                            update_product_price(click_target_id, set_price_prompt);
+                            addClass(click_target, "editted-product");
+                        }
+
+                        removeClass(click_target, "edit-product");
+                    }
+
+                    function update_product_price(product_id, price){
+
+                        // request updates from server
+                            HTTP_POST("update-product-price.php", "id=" + product_id + "&price=" + price, function(){
+
+                                // download updates
+                                    update_product_db_on_device();
+                            });
+                    }
+
+                    function update_product_db_on_device(){
+
+                        // get product db via ajax
+                            HTTP_POST(
+                                "get-product.php", 
+                                null,
+                                function(response){
+
+                                    if(product_db_json == response) { return; }
+
+                                    alert("Updating Price List");
+                                        
+                                    product_db_json = response;
+                                    appStorage.set("product", response);
+                                    render_product_list(response);
+                                }
+                            );
                     }
                 }
 
@@ -421,10 +495,10 @@
                     // scroll to screen when setup is complete
                         _subscribe_once(
                             'setup-complete', 
-                            'scroll_screen_into_view', 
+                            'scroll-screen-into-view', 
                             function(){ 
                                 
-                                scrollTo( thisScreen.offsetTop );
+                                scrollTo( thisScreen.offsetTop, 400);
                             }
                         );
 
@@ -511,6 +585,7 @@
                         if (change_tally > 0){
 
                             setFullscreenHeight();
+                            activeScreenIndex = activeScreens.length - 1;
                         }
                     }
                 }
@@ -701,7 +776,7 @@
 
                         function(){
 
-                            response();
+                            response(responseParams);
                             _unsubscribe(notification,subscriber);
                         },
 
@@ -714,11 +789,12 @@
 
                     var timer, start, factor;
 
-                    return function (target, duration) {
+                    return function (target, duration, callback) {
                         
                         var offset = window.pageYOffset,
                             delta  = target - window.pageYOffset; // Y-offset difference
                             duration = duration || 400;              // default 400ms animation
+                            callback = callback || function(){ _publish("arrived-at-new-screen", null, "scroll-screen-into-view"); };
                             start = Date.now();                       // get start time
                             factor = 0;
 
@@ -734,6 +810,8 @@
                             if( factor >= 1 ) {
                                 clearInterval(timer); // stop animation
                                 factor = 1;           // clip to max 1.0
+
+                                callback();
                             } 
 
                             y = factor * delta + offset;
