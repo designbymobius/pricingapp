@@ -351,3 +351,8 @@ html, body {
 
 		color: #fff;
 	}
+
+	#product-list .product .modified-value {
+
+		font-weight: 900;
+	}

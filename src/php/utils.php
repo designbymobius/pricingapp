@@ -17,20 +17,46 @@
 	define ("DB_PRODUCT_TABLE", 'product');
 	define ("DB_MANUFACTURER_TABLE", 'manufacturer');
 	define ("DB_PRODUCT_ALIAS_TABLE", 'product_alias');
-	define ("DB_PRODUCT_PRICE_TABLE", 'price');
 
 
 # -----------------------------------------------
 # DATABASE
 
-	// connect to DB server
-		function db_server_connect(){
+	// update product price
+		function update_price($product_id, $price){
 
-			$connect = mysql_connect(DB_HOST, DB_USER, DB_PASSWORD);
+			// req vars
+				$response = array();
+				$response['success'] = false;
 
-			if(!$connect){ die("COULDN'T CONNECT TO DB"); } 
+			// filter missing vars
+				if(!$product_id){
 
-			else{ return $connect; }
+					$response['msg'] = "PRODUCT ID FOR PRICE UPDATE IS MISSING";
+					return $response;
+				}
+				if(!$price){
+
+					$response['msg'] = "NO UPDATED PRICE TO STORE";
+					return $response;
+				}
+
+			// update db
+				$update_price_querystring = "UPDATE `" . DB_NAME ."`.`". DB_PRODUCT_TABLE . "` SET `Price` = '" . $price . "' WHERE `Id` = " . $product_id;
+				$update_price_query = mysql_query( $update_price_querystring );
+
+				if(!$update_price_query){
+
+					$response['msg'] = mysql_error();
+				}
+
+				else {
+
+					$response['success'] = true;
+					$response['msg'] = 'PRICE FOR PRODUCT ID ' . $product_id . ' UPDATED TO "' . $price . '"';					
+				}
+
+			return $response;
 		}
 
 	// add product to database		
@@ -228,6 +254,16 @@
 				}
 
 			return $response;
+		}
+
+	// connect to DB server
+		function db_server_connect(){
+
+			$connect = mysql_connect(DB_HOST, DB_USER, DB_PASSWORD);
+
+			if(!$connect){ die("COULDN'T CONNECT TO DB"); } 
+
+			else{ return $connect; }
 		}
 
 # ----------------------------------------------- 

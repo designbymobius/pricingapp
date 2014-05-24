@@ -21,7 +21,9 @@
 
         addProductName,
         addProductManufacturer,
-        addProductAltname;
+        addProductAltname,
+
+        deviceStorage;
 
     // bindings
         screen_setup.landing = setup_landing;
@@ -56,6 +58,9 @@
 
                     // Set Appcache Listeners
                         setAppcacheListeners();
+
+                    // Create Network Transaction Offline Storage Area
+                        setDeviceStorage();
 
                     // Set Current Network State
                         if( current_network_state === "up"){          
@@ -303,31 +308,37 @@
                 function setup_view_product_list(screen){
 
                     var product_db_json,
-                        list_wrapper = document.getElementById('product-list'),                        
-                        appStorage = new Persist.Store('Pricing App Storage',{
-
-                            about: "Data Storage to enhance Offline usage",
-                            path: location.href
-                        });
+                        list_wrapper = document.getElementById('product-list');
 
                     _subscribe_once("teardown-screen", "teardown", teardown);
 
                     _subscribe("screens-resized", "resize-list-wrapper", resize_list_wrapper);
 
+                    _subscribe("product-metadata-updated", "update-product-list", function(data){
+
+                        var updated_product_json = data.notificationParams;
+
+                        render_product_list( updated_product_json );
+                    });
+
                     resize_list_wrapper();
 
-                    appStorage.get("product", function(ok, value){
+                    // create product list
+                        deviceStorage.get("product", function(ok, value){
 
-                        if(value){
+                            // cache-hit
+                                if(value){
 
-                            product_db_json = value;
-                            render_product_list(value);
-                        }
+                                    product_db_json = value;
+                                    render_product_list(value);
+                                }
 
-                        update_product_db_on_device();
-                    });
-                                     
-                    list_wrapper.addEventListener("click", edit_product);
+                            // get lastest product list from server
+                                update_product_db_on_device();
+                        });
+                    
+                    // activate edit button on product list  
+                        list_wrapper.addEventListener("click", edit_product);
 
 
                     function teardown(){
@@ -335,6 +346,8 @@
                         list_wrapper.removeEventListener("click", edit_product);
 
                         _unsubscribe("screens-resized", "resize-list-wrapper");
+
+                        _unsubscribe("product-metadata-updated", "update-product-list");
                         
                         _subscribe_once("setup-complete", "cleanup-product-list", function(){
                             
@@ -359,77 +372,115 @@
                         if(!product_db_length || product_db_length < 1){
 
                             markup = "there are no products in the database ...";
+                            list_wrapper.innerHTML = markup;
                         } 
 
                         else {
 
-                            for (var i = product_db_length; i >= 1; i--) {
-                                
-                                markup += "<div class='product' data-product-name='" + product_db[ product_db_length - i ].Name + "' data-product-id='" + product_db[ product_db_length - i ].Id + "'> <div class='name'>" + product_db[ product_db_length - i ].Name + "</div> <div class='price'>" + (product_db[ product_db_length - i ].Price ? "&#8358;" + product_db[ product_db_length - i ].Price : "-----")  + "</div>" + "<div class='settings'>edit</div></div>";
-                            }
-                        }
+                            deviceStorage.get("transaction", function(ok, value){
 
-                        list_wrapper.innerHTML = markup;
+                                // required vars
+                                    var transactions_json = '{}',
+                                        transactions;
+
+                                // get prexisting transactions
+                                    if(value){ 
+
+                                        transactions_json = value;                                    
+                                    }
+
+                                // add product update to next transaction
+                                    transactions = JSON.parse(transactions_json);
+
+                                    if(!transactions.product){ transactions.product = {}; }
+
+                                    for (var i = product_db_length; i >= 1; i--) {
+
+                                        var product = product_db[ product_db_length - i ],
+                                            product_id = product.Id,
+                                            has_updates,
+                                            has_price_update,
+                                            price;
+
+                                        has_updates = transactions.product && transactions.product[ product_id ] ? true : false;
+                                        has_price_update = has_updates && transactions.product[ product_id ].price ? true : false;
+                                        price = has_price_update ? "&#8358;" + transactions.product[ product_id ].price : ( product.Price ? "&#8358;" + product.Price : "-----");
+                                        
+                                        markup += "<div class='product" + (has_updates ? " editted-product" : "") + "' data-product-name='" + product.Name + "' data-product-id='" + product_id + "'> <div class='name'>" + product.Name + "</div> <div class='price" + (has_price_update ? " modified-value" : "") + "'>" + price  + "</div>" + "<div class='settings'>edit</div></div>";
+                                    }                                    
+                                    
+                                    list_wrapper.innerHTML = markup;
+                            });
+                        }
                     }
                         
 
                     function edit_product(e){
 
-                        var click_target = e.target,
+                        var edit_btn = e.target,
+                            click_target,
                             click_target_id,
                             set_price_prompt;
 
-                        while( !hasClass(click_target, "settings") ){
+                        // filter events that arent from the edit btn
+                            while( !hasClass(edit_btn, "settings") ){
 
-                            if( click_target.parentNode == list_wrapper ){ return; }
-                            
-                            click_target = click_target.parentNode;
-                        }
+                                if( edit_btn.parentNode == list_wrapper ){ return; }
+                                
+                                edit_btn = edit_btn.parentNode;
+                            }
 
-                        click_target = click_target.parentNode;
+                        // identify the product
+                            click_target = edit_btn.parentNode;
 
-                        addClass(click_target, "edit-product");
+                            addClass(click_target, "edit-product");
 
-                        click_target_id = click_target.getAttribute('data-product-id');
+                            click_target_id = click_target.getAttribute('data-product-id');
 
-                        set_price_prompt = prompt("Set Price for '" + click_target.getAttribute('data-product-name').toUpperCase() + "'?");
+                        // get new price
+                            set_price_prompt = prompt("Set Price for '" + click_target.getAttribute('data-product-name').toUpperCase() + "'?");
 
-                        if(set_price_prompt !== null){
+                            if(set_price_prompt !== null){
 
-                            update_product_price(click_target_id, set_price_prompt);
-                            addClass(click_target, "editted-product");
-                        }
+                                var product_price = click_target.getElementsByClassName('price')[0];
 
-                        removeClass(click_target, "edit-product");
+                                update_product_price(click_target_id, set_price_prompt);
+
+                                product_price.innerHTML = "&#8358;" + set_price_prompt;
+                                addClass(product_price, "modified-value");
+
+                                addClass(click_target, "editted-product");
+                            }
+
+                        // remove visual identifier
+                            removeClass(click_target, "edit-product");
                     }
 
                     function update_product_price(product_id, price){
 
-                        // request updates from server
-                            HTTP_POST("update-product-price.php", "id=" + product_id + "&price=" + price, function(){
+                        deviceStorage.get("transaction", function(ok, value){
 
-                                // download updates
-                                    update_product_db_on_device();
-                            });
-                    }
+                            // required vars
+                                var transactions_json = '{}',
+                                    transactions;
 
-                    function update_product_db_on_device(){
+                            // get prexisting transactions
+                                if(value){ 
 
-                        // get product db via ajax
-                            HTTP_POST(
-                                "get-product.php", 
-                                null,
-                                function(response){
-
-                                    if(product_db_json == response) { return; }
-
-                                    alert("Updating Price List");
-                                        
-                                    product_db_json = response;
-                                    appStorage.set("product", response);
-                                    render_product_list(response);
+                                    transactions_json = value;                                    
                                 }
-                            );
+
+                            // add product update to next transaction
+                                transactions = JSON.parse(transactions_json);
+
+                                if(!transactions.product){ transactions.product = {}; }
+
+                                if(!transactions.product[product_id]){ transactions.product[product_id] = {}; }
+                                
+                                transactions.product[product_id].price = encodeURIComponent( price );
+
+                                deviceStorage.set('transaction', JSON.stringify(transactions));
+                        });
                     }
                 }
 
@@ -637,6 +688,108 @@
                         );
                 }
 
+            // send transaction to server
+                function doTransaction(){ 
+
+                    // req vars
+                    var stopTransactions = function(){
+
+                        clearInterval( intervals.transaction );
+                        delete intervals.transaction;
+                    };
+
+                    // check every 30 secs
+                        intervals.transaction = setInterval( function(){
+
+                            deviceStorage.get('transaction', function(ok, value){
+
+                                var transactions = JSON.parse(value),
+                                    has_transactions = false;
+
+                                if(!transactions){ return }
+
+                                for(var data in transactions){ if(transactions.hasOwnProperty(data)){ has_transactions = true; break; } }
+
+                                if(!has_transactions){ return }
+
+                                HTTP_POST(
+
+                                    "process-transaction.php",
+                                    "transaction=" + value,
+                                    function(response_json){
+
+                                        var response = JSON.parse(response_json);
+
+                                        update_product_db_on_device();
+
+                                        console.log("-- TRANSACTION REPORT --");
+
+                                        if(response.product){
+
+                                            deviceStorage.get('product', function(ok, value){
+
+                                                var product_db = JSON.parse(value);
+                                                
+                                                for(var id in response.product){
+
+                                                    var product_name;
+
+                                                    for (var i = product_db.length - 1; i >= 0; i--) {
+                                                        
+                                                        if(product_db[product_db.length - 1 - i].Id == id){
+
+                                                            product_name = product_db[product_db.length - 1 - i].Name;
+                                                            break;
+                                                        }
+                                                    }                                                   
+
+                                                    for(var property in response.product[id]){
+
+                                                        console.log(product_name.toUpperCase() + " " + property.toUpperCase() + " UPDATED TO '" + response.product[id][property] + "'");
+                                                    }
+                                                }
+                                            });
+                                        }
+                                    }
+                                );
+
+                                deviceStorage.set('transaction', "{}");
+                            });
+
+                        }, 1000 * 60 * 0.5);
+
+                    // stop transaction on disconnect from the internet
+                        _subscribe_once(
+                            "network-down",
+                            "transaction",
+                            stopTransactions,
+                            null
+                        );
+                }
+
+            // update product db on device
+                function update_product_db_on_device(){
+
+                    deviceStorage.get('product', function(ok, value){
+                        
+                        // get product db via ajax
+                            HTTP_POST(
+                                "get-product.php", 
+                                null,
+                                function(response){
+
+                                    // filter unchanged list
+                                        if(value == response) { return; }
+                                        
+                                    // update the pricelist
+                                        deviceStorage.set("product", response);
+                                    
+                                    _publish("product-metadata-updated", response, "update-product-db-ajax");
+                                }
+                            );
+                    });
+                }
+
             // flicker network connection lights
                 function flickerNetworkLights(){
 
@@ -732,6 +885,9 @@
                     // Online -> Continuously Check Network State
                         _subscribe( 'network-up', 'heartbeat', heartbeat );
 
+                    // Online -> Process Pending Transactions
+                        _subscribe( 'network-up', 'transaction', doTransaction );
+
                     // Offline -> Set Body Class
                         _subscribe( 'network-down', 'online-indicator', setOfflineBodyClass );
 
@@ -764,6 +920,23 @@
 
                     alert("Downloading App Updates - Sorry for the Wait");
                 }
+
+        /* OFFLINE STORAGE */
+
+            function setDeviceStorage(){
+
+                createDeviceStorage();
+            }
+
+            function createDeviceStorage(){
+
+                deviceStorage = new Persist.Store('Pricing App Storage', {
+
+                    about: "Data Storage to enhance Offline usage",
+                    path: location.href
+                });
+            }
+
 
         /* UTILS */
 
@@ -1017,5 +1190,6 @@
             init();
             goto = gotoScreen;
             ASE = activeScreens;
+            currentIntervals = intervals;
         });
 }());
