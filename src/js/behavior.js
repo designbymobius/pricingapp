@@ -318,6 +318,8 @@
 
                         var updated_product_json = data.notificationParams;
 
+                        alert("Loading Updates");
+
                         render_product_list( updated_product_json );
                     });
 
@@ -724,32 +726,33 @@
 
                                         console.log("-- TRANSACTION REPORT --");
 
-                                        if(response.product){
+                                        // product updates in the transaction
+                                            if(response.product){
 
-                                            deviceStorage.get('product', function(ok, value){
+                                                deviceStorage.get('product', function(ok, value){
 
-                                                var product_db = JSON.parse(value);
-                                                
-                                                for(var id in response.product){
+                                                    var product_db = JSON.parse(value);
+                                                    
+                                                    for(var id in response.product){
 
-                                                    var product_name;
+                                                        var product_name;
 
-                                                    for (var i = product_db.length - 1; i >= 0; i--) {
-                                                        
-                                                        if(product_db[product_db.length - 1 - i].Id == id){
+                                                        for (var i = product_db.length - 1; i >= 0; i--) {
+                                                            
+                                                            if(product_db[product_db.length - 1 - i].Id == id){
 
-                                                            product_name = product_db[product_db.length - 1 - i].Name;
-                                                            break;
+                                                                product_name = product_db[product_db.length - 1 - i].Name;
+                                                                break;
+                                                            }
+                                                        }                                                   
+
+                                                        for(var property in response.product[id]){
+
+                                                            console.log(product_name.toUpperCase() + " " + property.toUpperCase() + " UPDATED TO '" + response.product[id][property] + "'");
                                                         }
-                                                    }                                                   
-
-                                                    for(var property in response.product[id]){
-
-                                                        console.log(product_name.toUpperCase() + " " + property.toUpperCase() + " UPDATED TO '" + response.product[id][property] + "'");
                                                     }
-                                                }
-                                            });
-                                        }
+                                                });
+                                            }
                                     }
                                 );
 
