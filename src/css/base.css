@@ -20,13 +20,13 @@ html, body {
 	display: none;
 	opacity: 0.4;
 
-	padding: 3.0625em 2.1875em;
+	padding: 3.0625em 1em;
 
-	-webkit-transition: opacity 0.2s ease-out;
-	-moz-transition: opacity 0.2s ease-out;
-    -ms-transition: opacity 0.2s ease-out;
-    -o-transition: opacity 0.2s ease-out;
-	transition: opacity 0.2s ease-out;
+	-webkit-transition: opacity 0.2s ease-in;
+	-moz-transition: opacity 0.2s ease-in;
+    -ms-transition: opacity 0.2s ease-in;
+    -o-transition: opacity 0.2s ease-in;
+	transition: opacity 0.2s ease-in;
 }
 
 .fullscreen.focal {
@@ -115,7 +115,8 @@ html, body {
 	float: right;
 }
 
-.fullscreen input {
+.fullscreen input,
+.fullscreen select.large {
 
 	width: 97.5%;
 	margin: 1em 1.25%;
@@ -283,13 +284,14 @@ html, body {
 	}
 
 /* Add Products */
-	.add-product.focal input.attention {
+	.add-product.focal input.attention,
+	.add-product.focal select.attention {
 
 		border-color: red;
 		color: red;
 	}
 
-	.add-product #product-metadata{
+	.add-product #product-metadata {
 
 		font-weight: 900;
 		line-height: 2em;
@@ -297,25 +299,31 @@ html, body {
 		text-transform: uppercase;
 	}
 
+	.add-product select.manufacturer-list {
+
+		margin-bottom: .5em;
+	}
+
 /* View Products */
 	#product-list {
 
-		width: 95%;
-		padding-right: 5%;
+		width: 100%;
+		font-size: 0.85em;
 		overflow: auto;
 	}
 
 	#product-list .product {
 
+		position: relative;
 		border-bottom: 1px solid #ddd;
 		text-transform: uppercase;
 		padding: 1em;
 		line-height: 1.25em;
 	}
 
-	#product-list .product.edit-product {
+	#product-list .manufacturer-filter-match {
 
-		background-color: orange;
+		background-color: #ffa;
 	}
 
 	#product-list .product.editted-product {
@@ -323,28 +331,62 @@ html, body {
 		background-color: #8f8;
 	}
 
+	#product-list .product.edit-product {
+
+		background-color: orange;
+	}
+
 	#product-list .product > div {
 
 		display: inline-block;
 	}
 
-	#product-list .product .name {
+	#product-list .product .collapsed-content {
 
-		width: 60%;
+		display: none;
 	}
 
-	#product-list .product .price,
+	#product-list .product .name {
+
+		width: 39%;
+	}
+
+	#product-list .product .wholesale-price,
+	#product-list .product .retail-price,
 	#product-list .product .settings {
 
-		width: 19%;
-		text-align: right;
+		width: 20%;
 	}
 
 	#product-list .product .settings {
 
 		color: #aaa;
 		font-size: 0.7em;
+		text-align: right;
 		letter-spacing: 0.3em;
+	}
+
+	#product-list .edit-product .collapsed-content {
+
+		display: inline-block;
+	}
+
+	#product-list .edit-product .name {
+		
+		color: #fff;
+		font-weight: 900;
+		font-size: 144%;
+		line-height: 1.2em;
+		text-shadow: 1px 1px 1px #AA763E;
+	}
+
+	#product-list .edit-product .retail-price,
+	#product-list .edit-product .wholesale-price {
+
+		color:	#ffa;
+		font-size: 120%;
+		font-weight: 900;
+		text-shadow: 1px 1px 1px #AA763E;
 	}
 
 	#product-list .edit-product .settings {
@@ -352,7 +394,103 @@ html, body {
 		color: #fff;
 	}
 
+	#product-list .edit-product .settings .options {
+
+		position: absolute;
+		border: 8px solid #fff;
+		background-color: #fff;
+		color: #fff;
+		padding: 0px;
+		margin: .35em 0 0 -6.8em;
+		font-size: .85em;
+		list-style: none;
+		text-align: center;
+
+		z-index: 100;
+	}
+
+	#product-list .edit-product .settings .options li {
+		
+		background-color: #b84915;
+		margin-bottom: .5em;
+		padding: .5em .75em;
+	}
+
+	#product-list .edit-product .settings > span {
+
+		background-color: #fff;
+		padding: .7em .75em;
+		color: red;
+		font-weight: 900;
+	}
+
+	#product-list .edit-product .settings .options li:hover,
+	#product-list .edit-product .settings .options li:active {
+
+		background-color: #C46005;
+	}
+
 	#product-list .product .modified-value {
 
 		font-weight: 900;
 	}
+
+	#product-list.filtered .product {
+
+		display: none;
+	}
+
+	#product-list.filtered .manufacturer-filter-match {
+
+		display: block;
+	}
+
+	#manufacturer-filter {
+
+		float: right;
+		padding: .25em .75em;
+		background-color: #eee;
+	}
+
+	#manufacturer-filter label {
+
+		text-transform: uppercase;
+		color: #444;
+		font-size: 0.7em;
+		letter-spacing: 0.15em;
+		padding-right: .5em;
+	}
+
+@media only screen and (min-width:500px)  { 
+
+	.fullscreen {
+
+		font-size: 108%;
+		padding: 3em 2.5em;
+	}
+}
+
+@media only screen and (min-width:625px)  { 
+
+	.fullscreen {
+
+		font-size: 127%;
+	}
+}
+
+@media only screen and (min-width:900px)  { 
+
+	.fullscreen {
+
+		font-size: 133%;
+		padding: 3.25em 5em;
+	}
+}
+
+@media only screen and (min-width:1120px)  {
+
+	#product-list .edit-product .settings .options {
+
+		margin-left: 5.5em;
+	}
+} 

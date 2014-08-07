@@ -1,7 +1,7 @@
 (function(){
 
-    // container
-    var app = {},
+    // required vars
+        var app = {},
 
         intervals = {},
 
@@ -14,23 +14,20 @@
         _unsubscribe = pubsub.unsubscribe,
         
         allScreens = document.getElementsByClassName('fullscreen'),
-        screen_setup = {},
-
         activeScreenIndex = 0,
         activeScreens = [],
+        screen_setup = {},
 
         addProductName,
         addProductManufacturer,
-        addProductAltname,
 
         deviceStorage;
 
-    // bindings
+    // screen setup bindings
         screen_setup.landing = setup_landing;
-        screen_setup.tasks = setup_tasks;
+        screen_setup.view_product_list = setup_view_product_list;
         screen_setup.add_product_metadata = setup_add_product_metadata;
         screen_setup.add_product_confirmation = setup_add_product_confirmation;
-        screen_setup.view_product_list = setup_view_product_list;
 
     // internal functions
 
@@ -39,8 +36,18 @@
             // get the app started
                 function init(){
 
-                    // req vars
-                    var current_network_state = networkState();
+                    // Disable Touch Scrolling
+                        document.addEventListener('touchmove', function(e){
+
+                            var swipe_target = e.target;
+
+                            while(swipe_target !== document.body){
+                                
+                                swipe_target = swipe_target.parentNode;
+                            }
+
+                            e.preventDefault();
+                        });
 
                     // Load Starting Pages
                         resetActiveScreens();
@@ -60,25 +67,27 @@
                         setAppcacheListeners();
 
                     // Create Network Transaction Offline Storage Area
-                        setDeviceStorage();
+                        createDeviceStorage();
 
                     // Set Current Network State
-                        if( current_network_state === "up"){          
+                        if( networkState() === "up"){          
 
-                            _publish("network-up", null, this);
-                        } 
+                            _publish("network-up", null, 'app-init');
+                        }
+
                         else {          
 
-                            _publish("network-down", null, this);           
+                            _publish("network-down", null, 'app-init');           
                         }
 
                     // Prepare Screen Setup Listeners
                         screenSetupHandlers();
 
+                    // Activate the Requested Screen
                         gotoScreen( activeScreenIndex );
                 }
 
-        /* SCREEN SETUPS */
+        /* SCREENS */
 
             // landing
                 function setup_landing(screen){
@@ -116,36 +125,7 @@
                     }
                 }
 
-            // tasks
-                function setup_tasks(screen){
-
-                    /* SETUP */
-
-                        // req vars
-                        var addProductsBtn = document.getElementById('start-add-product'),
-                            viewProductsBtn = document.getElementById('start-view-products');
-                    
-                        // prep for teardown
-                            _subscribe_once('teardown-screen', 'tasks', teardown);
-
-                    /* ENABLE TASK LINKS */
-
-                        // view products
-                            viewProductsBtn.addEventListener("click", viewProductsWorkflow);
-
-                        // add product
-                            addProductsBtn.addEventListener("click", addProductsWorkflow);
-
-
-                    function teardown(){
-
-                        // disable task links
-                            addProductsBtn.removeEventListener("click", addProductsWorkflow);
-                            viewProductsBtn.removeEventListener("click", viewProductsWorkflow);
-                    }
-                }
-
-            // add product manufacturer
+            // add product metadata
                 function setup_add_product_metadata(screen){
 
                     /* SETUP */
@@ -154,10 +134,14 @@
                             var currentScreenInputs = screen.getElementsByTagName('input'),
                                 productNameInput = screen.getElementsByClassName('product-name')[0],
                                 manufacturerNameInput = screen.getElementsByClassName('manufacturer-name')[0],
+                                manufacturerList = screen.getElementsByClassName('manufacturer-list')[0],
                                 nextBtn = screen.getElementsByClassName('btn')[0];
 
                         //  activate next btn
                             nextBtn.addEventListener("click", nextBtnHandler);
+
+                        // enter button handler
+                            window.addEventListener("keydown", enterBtnHandler);
                     
                         // prep for teardown
                             _subscribe_once('teardown-screen', 'add-product-metadata', teardown);
@@ -167,36 +151,14 @@
 
                                 addProductName = null;
                                 addProductManufacturer = null;
-                                addProductAltname = null;
                             });
 
+                        // push manufacturer list value to manufacturer name input
+                            manufacturerList.addEventListener("change", update_manufacturer_name_field);
 
-                    function nextBtnHandler(){
+                        // populate manufacturer list
+                            render_manufacturer_list();
 
-                        // required vars
-                            var missingInput = 0,
-                                totalInputs = currentScreenInputs.length;
-
-                        // mark empty fields
-                            for (var i = totalInputs - 1; i >= 0; i--){
-
-                                if( currentScreenInputs[i].value ){ continue; } 
-                                
-                                missingInput += 1;
-
-                                addClass( currentScreenInputs[i], "attention");
-
-                                currentScreenInputs[i].addEventListener("keydown", confirmValueExists);
-                            }
-
-                        // proceed if nothing is missing
-                            if(missingInput < 1){
-
-                                addProductName = productNameInput.value;
-                                addProductManufacturer = manufacturerNameInput.value;
-                                gotoNextScreen();
-                            }
-                    }
 
                     function teardown(){
 
@@ -215,8 +177,156 @@
                                     }
                             }
 
-                        // disable next btn
-                            nextBtn.removeEventListener("click", nextBtnHandler);
+                            if ( hasClass(manufacturerList, "attention") ){
+
+                                removeClass(manufacturerList, "attention");
+                            }
+
+                        // clean up listeners
+                            nextBtn.removeEventListener("click", nextBtnHandler);                            
+                            window.removeEventListener("keydown", enterBtnHandler);
+                            manufacturerNameInput.removeEventListener("change", update_manufacturer_name_field);
+                    }
+
+                    function render_manufacturer_list(){
+
+                        // required vars
+                            var manufacturer_db_json,
+                                manufacturer_db;
+
+                        // load
+                            deviceStorage.get("manufacturer", function(ok, value){
+
+                                if(ok && value !== null){
+
+                                    manufacturer_db_json = value;
+                                    do_list_rendering(manufacturer_db_json);
+                                }
+
+                                _subscribe_once(
+
+                                    "manufacturer-metadata-updated",
+                                    "render-manufacturer-list",
+                                    render_newest_db
+                                );
+                                
+                                download_current_manufacturer_db();
+
+                                function render_newest_db(data){
+
+                                    if(manufacturer_db_json == data.notificationParams){ return; }
+                                    
+                                    manufacturer_db_json = data.notificationParams;
+                                    do_list_rendering(manufacturer_db_json);
+                                }
+                            });
+
+                            function do_list_rendering(manufacturer_db_json){
+
+                                var manufacturer_json = manufacturer_db_json,
+                                    markup = "<option value='0'>-- Select Manufacturer --</option>";
+
+                                manufacturer_db = JSON.parse(manufacturer_db_json);
+
+                                manufacturer_db.sort(function(a, b){
+
+                                    a = a.Name.toLowerCase();
+                                    b = b.Name.toLowerCase();
+
+                                    if(a > b){ return 1; }
+                                    else if(b > a){ return -1; }
+                                    else { return 0; }
+                                });
+
+                                for(var manufacturer in manufacturer_db){
+
+                                    markup += "<option value='" + manufacturer_db[manufacturer].Id + "'>" + manufacturer_db[manufacturer].Name.toUpperCase() + "</option>"; 
+                                }
+
+                                markup += "<option value='-1'>-- New Manufacturer --</option>";
+
+                                manufacturerList.innerHTML = markup;
+                            }
+                    }
+
+                    function update_manufacturer_name_field(){
+
+                        var option = manufacturerList.options[manufacturerList.selectedIndex],
+                            option_value = option.value,
+                            option_text = option.text;
+
+                        // add new manufacturer
+                            if(option_value === "-1"){
+
+                                // view manufacturer name field
+                                    manufacturerNameInput.value = "";
+
+                                    if(manufacturerNameInput.type != "text"){
+                                        manufacturerNameInput.type = "text";
+                                    }
+
+                                    manufacturerNameInput.focus();
+
+                                // reset view state on screen teardown
+                                    _subscribe_once('teardown-screen', 'hide-manufacturer-textfield', function(){
+                                    
+                                        manufacturerNameInput.type = "hidden";
+                                    });
+
+                                return;
+                            }
+
+                        // hide default input field
+                            if(manufacturerNameInput.type != "hidden"){
+
+                                manufacturerNameInput.type = "hidden";
+                            }
+
+                        // blank option - do nothing
+                            if(option_value === "0"){ return; }
+
+                        // default - set hidden manufacturer field                         
+                            manufacturerNameInput.value = option_text;
+                    }
+
+                    function nextBtnHandler(){
+
+                        // required vars
+                            var missingInput = 0,
+                                totalInputs = currentScreenInputs.length;
+
+                        // mark empty fields
+                            for (var i = totalInputs - 1; i >= 0; i--){
+
+                                if( currentScreenInputs[i].value ){ continue; }
+
+                                if( currentScreenInputs[i] == manufacturerNameInput && manufacturerNameInput.getAttribute('type') == "hidden"){
+
+                                    addClass( manufacturerList, "attention");
+                                    manufacturerList.addEventListener("change", manufacturerSelected);                                    
+                                } 
+                                
+                                missingInput += 1;
+
+                                addClass( currentScreenInputs[i], "attention");
+
+                                currentScreenInputs[i].addEventListener("keyup", confirmValueExists);
+                            }
+
+                        // proceed if nothing is missing
+                            if(missingInput < 1){
+
+                                addProductName = productNameInput.value;
+                                addProductManufacturer = manufacturerNameInput.value;
+                                gotoNextScreen();
+                            }
+                    }
+
+                    function enterBtnHandler(e){
+
+                        if(e.keyCode != 13){ return; }
+
+                        nextBtnHandler();
                     }
 
                     function confirmValueExists(e){
@@ -225,6 +335,14 @@
 
                         removeClass(e.target, "attention");
                         e.target.removeEventListener("keydown", confirmValueExists);
+                    }
+
+                    function manufacturerSelected(){
+
+                        if(!manufacturerNameInput.value){ return; }
+
+                        removeClass(manufacturerList, "attention");
+                        manufacturerList.addEventListener("keyup", manufacturerSelected);
                     }
                 }
 
@@ -250,11 +368,16 @@
 
                     // Activate Submit Button
                         create_product_btn.addEventListener("click", add_product_to_db);
+                        
+                    // Enter Key Behavior
+                        window.addEventListener("keydown", enterBtnHandler);
 
+                    // Teardown
                         _subscribe_once("teardown-screen", "add-product-confirmation", function(){
 
                             // disable finalize button
                                 create_product_btn.removeEventListener("click", add_product_to_db);
+                                window.removeEventListener("keydown", enterBtnHandler);
 
                             // wipe manufacturer name slots
                                 for (var i = manufacturer_name_slots.length - 1; i >= 0; i--) {
@@ -269,6 +392,13 @@
                                 } 
                         });
 
+                    function enterBtnHandler(e){
+
+                        if(e.keyCode != 13){ return; }
+
+                        create_product_btn.click();
+                    }
+
                     function add_product_to_db(){
 
                         // required vars
@@ -278,8 +408,11 @@
                             product_metadata.name = encodeURIComponent( addProductName );
                             product_metadata.manufacturer = encodeURIComponent( addProductManufacturer );
 
+                            product_hash = CryptoJS.SHA1( JSON.stringify(product_metadata) ).toString();
+
                         // send to server
-                            HTTP_POST("add-product.php", "product=" + JSON.stringify(product_metadata) );
+                            create_transaction('product', 'create-' + product_hash, 'name', addProductName);
+                            create_transaction('product', 'create-' + product_hash, 'manufacturer', addProductManufacturer);
 
                         // restart task dialog
                             restart_task = confirm("Done! Add Another Product?");                            
@@ -307,127 +440,489 @@
             // view product list
                 function setup_view_product_list(screen){
 
-                    var product_db_json,
-                        list_wrapper = document.getElementById('product-list');
+                    // required vars
+                        var product_list_wrapper = document.getElementById('product-list'),                        
+                            manufacturer_list_wrapper = document.getElementById('manufacturer-list'),
+                            product_list_touchstart_pos;
 
-                    _subscribe_once("teardown-screen", "teardown", teardown);
+                    // teardown
+                        _subscribe_once("teardown-screen", "teardown", teardown);
 
-                    _subscribe("screens-resized", "resize-list-wrapper", resize_list_wrapper);
+                    // update product list view when model updates
+                        _subscribe("product-metadata-updated", "update-product-list", function(data){
 
-                    _subscribe("product-metadata-updated", "update-product-list", function(data){
+                            alert("Loading Updates");
 
-                        var updated_product_json = data.notificationParams;
-
-                        alert("Loading Updates");
-
-                        render_product_list( updated_product_json );
-                    });
-
-                    resize_list_wrapper();
-
-                    // create product list
-                        deviceStorage.get("product", function(ok, value){
-
-                            // cache-hit
-                                if(value){
-
-                                    product_db_json = value;
-                                    render_product_list(value);
-                                }
-
-                            // get lastest product list from server
-                                update_product_db_on_device();
+                            render_product_list();
                         });
-                    
-                    // activate edit button on product list  
-                        list_wrapper.addEventListener("click", edit_product);
 
+                    // update manufacturer list view when model updates
+                        _subscribe("manufacturer-metadata-updated", "update-manufacturer-list", function(data){
+
+                            render_manufacturer_list();
+                        });
+
+                    // log failed transaction and reattempt
+                        _subscribe("requeue-failed-transaction", "update-product-list", function(data){
+
+                            console.log('requeue data');
+                            console.log(data.notificationParams);
+                        });
+
+                    // filter rendered product list by manufacturer
+                        _subscribe("product-list-rendered", "filter-by-manufacturer", function(){
+
+                                if ("createEvent" in document) {
+                                    var evt = document.createEvent("HTMLEvents");
+                                    evt.initEvent("change", false, true);
+                                    manufacturer_list_wrapper.dispatchEvent(evt);
+                                }
+                                
+                                else {
+                                    manufacturer_list_wrapper.fireEvent("onchange");
+                                }
+                            }
+                        );
+
+                    // fit list wrapper to screen size and update on resize
+                        resize_list_wrappers();
+                        _subscribe("screens-resized", "resize-list-wrappers", resize_list_wrappers);
+                    
+                    // product list edit button behavior
+                        product_list_wrapper.addEventListener("click", edit_product);
+
+                    // activate touch scrolling
+                        product_list_wrapper.addEventListener("touchstart", set_scroll_touch_position);
+                        product_list_wrapper.addEventListener("touchmove", product_list_wrapper_scroll);
+
+                    // activate filtering by manufacturer
+                        manufacturer_list_wrapper.addEventListener("change", manufacturer_filter);
+
+                    // render modules
+                        render_product_list();
+                        render_manufacturer_list();
+                        create_add_product_btn();
 
                     function teardown(){
 
-                        list_wrapper.removeEventListener("click", edit_product);
+                        product_list_wrapper.removeEventListener("click", edit_product);
+                        product_list_wrapper.removeEventListener("touchmove", product_list_wrapper_scroll);
 
                         _unsubscribe("screens-resized", "resize-list-wrapper");
 
+                        _unsubscribe("product-list-rendered", "filter-by-manufacturer");
+
                         _unsubscribe("product-metadata-updated", "update-product-list");
+                        _unsubscribe("requeue-failed-transaction", "update-product-list");
                         
                         _subscribe_once("setup-complete", "cleanup-product-list", function(){
                             
                             setTimeout(function(){
                                 
-                                render_product_list('{}');
+                                product_list_wrapper.innerHTML = "";
+                                
+
+                                manufacturer_list_wrapper.selectedIndex = 0;
+
+                                if ("createEvent" in document) {
+                                    var evt = document.createEvent("HTMLEvents");
+                                    evt.initEvent("change", false, true);
+                                    manufacturer_list_wrapper.dispatchEvent(evt);
+                                }
+                                
+                                else {
+                                    manufacturer_list_wrapper.fireEvent("onchange");
+                                }
+
+                                manufacturer_list_wrapper.removeEventListener("change", manufacturer_filter);
                             }, 150);
                         });
                     }
 
-                    function resize_list_wrapper(){
+                    function product_list_wrapper_scroll(e){
 
-                        list_wrapper.style.height = (screen.offsetHeight * 0.7) + "px";
+                        var click_target = e.target,
+                            product_list_touch_pos = e.changedTouches[0].clientY;
+
+
+                        // filter events that arent from the product list
+                            while( click_target != product_list_wrapper ){
+
+                                if( click_target.parentNode == screen || click_target.parentNode == document.body ){ return; }
+                                click_target = click_target.parentNode;
+                            }
+
+                        // prevent product list scroll from bubbling to body where all touchmove events go to die
+                            if( (click_target.scrollTop < (click_target.scrollHeight - click_target.clientHeight) && product_list_touch_pos - product_list_touchstart_pos < 0) || (click_target.scrollTop > 0 && product_list_touch_pos - product_list_touchstart_pos > 0 )){ 
+                                
+                                e.stopPropagation(); 
+                            }
                     }
 
-                    function render_product_list( product_db_json ){
+                    function set_scroll_touch_position(e){
 
-                        var product_db = JSON.parse( product_db_json ),
-                            product_db_length = product_db.length,
-                            markup = "";
+                        product_list_touchstart_pos = e.changedTouches[0].clientY;
+                    }
 
-                        if(!product_db_length || product_db_length < 1){
+                    function resize_list_wrappers(){
 
-                            markup = "there are no products in the database ...";
-                            list_wrapper.innerHTML = markup;
-                        } 
+                        resize_product_list_wrapper();
+                    }
 
-                        else {
+                    function resize_product_list_wrapper(){
+
+                        product_list_wrapper.style.height = (screen.offsetHeight * 0.7) + "px";
+                    }
+
+                    function resize_manufacturer_list_wrapper(){
+
+                        manufacturer_list_wrapper.style.height = (screen.offsetHeight * 0.2) + "px";
+                    }
+
+                    function render_manufacturer_list(){
+
+                        var markup = "<option value='-1'>ALL</option>",
+                            manufacturer_db_json,
+                            manufacturer_db;
+
+                        // load
+                            deviceStorage.get("manufacturer", function(ok, value){
+
+                                // if local data exists, render it
+                                    if(ok && value !== null){
+
+                                        manufacturer_db_json = value;
+                                        do_list_rendering();
+                                    }
+
+                                // rerender list when next the metadata is updated
+                                    _subscribe_once(
+
+                                        "manufacturer-metadata-updated",
+                                        "render-product-list",
+                                        function(data){
+
+                                            manufacturer_db_json = data.notificationParams;
+                                            do_list_rendering();
+                                        }
+                                    );
+                                
+                                // check for updates
+                                    download_current_manufacturer_db();
+                            });
+
+                            function do_list_rendering(){
+
+                                // get array of manufacturers
+                                    manufacturer_db = JSON.parse(manufacturer_db_json);
+
+                                // sort manufacturers alphabetically
+                                    manufacturer_db.sort(function(a, b){
+
+                                        a = a.Name.toLowerCase();
+                                        b = b.Name.toLowerCase();
+
+                                        if(a > b){ return 1; }
+                                        else if(b > a){ return -1; }
+                                        else { return 0; }
+                                    });
+
+                                // add each option to the markup
+                                    for(var manufacturer in manufacturer_db){
+
+                                        markup += "<option value='" + manufacturer_db[manufacturer].Id + "'>" + manufacturer_db[manufacturer].Name.toUpperCase() + "</option>"; 
+                                    }
+
+                                // render liost
+                                    manufacturer_list_wrapper.innerHTML = markup;
+                            }
+                    }
+
+                    function render_product_list(){
+
+                        var markup = "",
+
+                            product_db_json,
+                            transaction_db_json,
+                            manufacturer_db_json;
+
+                        // load required db data
+                            deviceStorage.get("product", function(ok, value){
+
+                                if(ok && value !== null){
+
+                                    product_db_json = value;
+
+                                    if(all_dbs_loaded()){
+
+                                        do_list_rendering();
+                                    }
+                                }
+
+                                _subscribe_once(
+
+                                    "product-metadata-updated",
+                                    "render-product-list",
+                                    function(data){
+
+                                        product_db_json = data.notificationParams;
+
+                                        if(all_dbs_loaded()){
+
+                                            do_list_rendering();
+                                        }
+                                    }
+                                );
+
+                                download_current_product_db();
+                            });
+
+                            deviceStorage.get("manufacturer", function(ok, value){
+
+                                if(ok && value !== null){
+
+                                    manufacturer_db_json = value;
+
+                                    if(all_dbs_loaded()){
+
+                                        do_list_rendering();
+                                    }
+                                }
+
+                                _subscribe_once(
+
+                                    "manufacturer-metadata-updated",
+                                    "render-product-list",
+                                    function(data){
+
+                                        manufacturer_db_json = data.notificationParams;
+
+                                        if(all_dbs_loaded()){
+
+                                            do_list_rendering();
+                                        }
+                                    }
+                                );
+
+                                download_current_manufacturer_db();
+                            });
 
                             deviceStorage.get("transaction", function(ok, value){
 
-                                // required vars
-                                    var transactions_json = '{}',
-                                        transactions;
+                                if(ok && value !== null){
 
-                                // get prexisting transactions
-                                    if(value){ 
+                                    transaction_db_json = value;
 
-                                        transactions_json = value;                                    
+                                    if(all_dbs_loaded()){
+
+                                        do_list_rendering();
                                     }
+                                }
 
-                                // add product update to next transaction
-                                    transactions = JSON.parse(transactions_json);
+                                else {
 
-                                    if(!transactions.product){ transactions.product = {}; }
+                                   transaction_db_json = "{}";
 
-                                    for (var i = product_db_length; i >= 1; i--) {
+                                    if(all_dbs_loaded()){
 
-                                        var product = product_db[ product_db_length - i ],
-                                            product_id = product.Id,
-                                            has_updates,
-                                            has_price_update,
-                                            price;
+                                        do_list_rendering();
+                                    }                                   
+                                }
+                            });
 
-                                        has_updates = transactions.product && transactions.product[ product_id ] ? true : false;
-                                        has_price_update = has_updates && transactions.product[ product_id ].price ? true : false;
-                                        price = has_price_update ? "&#8358;" + transactions.product[ product_id ].price : ( product.Price ? "&#8358;" + product.Price : "-----");
+                        function do_list_rendering(){
+
+                            // required vars
+                                var model_to_render,
+                                    model_length,
+
+                                    product_db,
+                                    transaction_db,
+                                    manufacturer_db,
+
+                                    product_db_id_model,
+                                    manufacturer_db_id_model;
+
+                            // create dbs and models needed
+                                manufacturer_db = JSON.parse(manufacturer_db_json);
+                                transaction_db = JSON.parse(transaction_db_json);
+                                product_db = JSON.parse(product_db_json);
+                                
+                                product_db_id_model = key_model_db_json(product_db_json, 'Id');                              
+                                manufacturer_db_id_model = key_model_db_json(manufacturer_db_json, 'Id');
+
+                            // set base model to render
+                                model_to_render = product_db;
+
+                            // add transaction　data to model being rendered
+                                if(!transaction_db.product){ transaction_db.product = {}; }
+                                
+                                for (var this_product_id in transaction_db.product) {
+
+                                    // required vars
+                                        var this_product = transaction_db.product[ this_product_id ];
+
+                                    // filter
+                                        if( !transaction_db.product.hasOwnProperty(this_product_id) ){ continue; }
+
+                                    // update to existing product
+                                        if(typeof product_db_id_model[ this_product_id ] != 'undefined'){
+
+                                            // overlay product's transaction properties over its product db properties
+                                                product_db_id_model[ this_product_id ] = copyObj({
+
+                                                    "srcObj": transaction_db.product[ this_product_id ],
+                                                    "output": product_db_id_model[ this_product_id ]
+                                                });
+                                        }
+
+                                    // new product
+                                        else {
+
+                                            // required vars
+                                                var manufacturer_db_name_model = key_model_db_json(manufacturer_db_json, "Name"),
+                                                    confirmed_manufacturer_id;
+                                                
+                                            // if manufacturer exists, get its id
+                                                if(manufacturer_db_name_model[ this_product.manufacturer.toLowerCase() ]){  
+
+                                                    // set manufacturer id
+                                                        confirmed_manufacturer_id = manufacturer_db_name_model[ this_product.manufacturer.toLowerCase() ].Id;
+                                                }
+
+                                            // inject product into list view data-source
+                                                model_to_render.push(
+                                                    
+                                                    // overlay transaction data over acquired data
+                                                        copyObj({
+                                                            "srcObj": this_product,
+                                                            "output": 
+                                                                { 
+                                                                    "Id": this_product_id,
+                                                                    "Name": this_product.name,
+                                                                    "ManufacturerId": (confirmed_manufacturer_id ? confirmed_manufacturer_id : "n/a")
+                                                                }
+                                                        })
+                                                );
+                                        }
+                                }
+
+                            // cache length of render model
+                                model_length = model_to_render.length;
+
+                            // filter empty render model
+                                if(!model_to_render || model_length < 1){
+
+                                    markup += "there are no products to display";
+                                }
+
+                            // process data models for rendering
+                                else {
+
+                                // alpha-sort model to render
+                                    model_to_render.sort(function(a, b){
+
+                                        a = a.Name.toLowerCase();
+                                        b = b.Name.toLowerCase();
+
+                                        if(a > b){ return 1; }
+                                        else if(b > a){ return -1; }
+                                        else { return 0; }
+                                    });
+
+                                // each product in model to render
+                                    for (var i = model_to_render.length; i > 1; i--) {
+
+                                        // required vars
+                                            var product = model_to_render[ model_length - i ],
+                                                
+                                                product_id = product.Id,
+                                                manufacturer_id = product.ManufacturerId,
+
+                                                has_updates,
+                                                has_retail_price_update,
+                                                has_wholesale_price_update,
+                                                
+                                                retail_price,
+                                                wholesale_price;
+
+                                        // set flags
+                                            has_updates = transaction_db.product[ product_id ] ? true : false;
+                                            has_retail_price_update = has_updates && transaction_db.product[ product_id ].RetailPrice ? true : false;
+                                            has_wholesale_price_update = has_updates && transaction_db.product[ product_id ].WholesalePrice ? true : false;
                                         
-                                        markup += "<div class='product" + (has_updates ? " editted-product" : "") + "' data-product-name='" + product.Name + "' data-product-id='" + product_id + "'> <div class='name'>" + product.Name + "</div> <div class='price" + (has_price_update ? " modified-value" : "") + "'>" + price  + "</div>" + "<div class='settings'>edit</div></div>";
+                                        // set prices
+                                            retail_price = has_retail_price_update && product_db_id_model[product_id] ? "&#8358;" + product_db_id_model[product_id].RetailPrice : product.RetailPrice ? "&#8358;" + product.RetailPrice : "-----";                                        
+                                            wholesale_price = has_wholesale_price_update && product_db_id_model[product_id] ? "&#8358;" + product_db_id_model[ product_id ].WholesalePrice : product.WholesalePrice ? "&#8358;" + product.WholesalePrice : "-----";
+                                        
+                                        // add product to markup being rendered 
+                                            markup +=   "<div class='product" + (has_updates ? " editted-product" : "") + "' " + 
+                                                            "data-product-name='" + product.Name + "' " +
+                                                            "data-product-id='" + product_id + "' " + 
+                                                            "data-manufacturer-id='" + manufacturer_id + "'" + 
+                                                        ">" + 
+                                                            "<div class='name'>" + 
+                                                                "<span class='collapsed-content'>" + manufacturer_db_id_model[ manufacturer_id ].Name + "</span> " + 
+                                                                product.Name + 
+                                                            "</div>"+
+
+                                                            "<div class='wholesale-price" + (has_wholesale_price_update ? " modified-value" : "") + "'>" + 
+                                                                wholesale_price  + 
+                                                            "</div>" + 
+
+                                                            "<div class='retail-price" + (has_retail_price_update ? " modified-value" : "") + "'>" + 
+                                                                retail_price  + 
+                                                            "</div>" + 
+
+                                                            "<div class='settings'>"+
+                                                                "<span>edit</span>"+
+                                                            "</div>"+
+                                                        "</div>";
                                     }                                    
                                     
-                                    list_wrapper.innerHTML = markup;
-                            });
+                                }
+                            
+                            // render markup and publish
+                                product_list_wrapper.innerHTML = markup;
+                                _publish("product-list-rendered", null, "render-product-list");
                         }
-                    }
-                        
+
+                        function all_dbs_loaded(){
+
+                            var load_status = false;
+
+                            if(
+                                typeof product_db_json != "undefined" &&
+                                typeof transaction_db_json != "undefined" &&
+                                typeof manufacturer_db_json != "undefined"
+                            ){
+
+                                load_status = true;
+                            }
+
+                            return load_status;
+                        }
+                    }                        
 
                     function edit_product(e){
 
-                        var edit_btn = e.target,
+                        // required vars
+                            var edit_btn = e.target,
+                            
                             click_target,
                             click_target_id,
+
+                            edit_options_markup,
+                            edit_options,
+                            edit_wholesale_price_btn,
+                            edit_retail_price_btn,
+                            
                             set_price_prompt;
 
                         // filter events that arent from the edit btn
                             while( !hasClass(edit_btn, "settings") ){
 
-                                if( edit_btn.parentNode == list_wrapper ){ return; }
+                                if( edit_btn.parentNode == product_list_wrapper || edit_btn.parentNode == document.body ){ return; }
                                 
                                 edit_btn = edit_btn.parentNode;
                             }
@@ -435,58 +930,164 @@
                         // identify the product
                             click_target = edit_btn.parentNode;
 
+                        // if options menu is already open ... bail
+                            if(edit_btn.getElementsByClassName('options').length > 0){
+
+                                return;
+                            }
+
                             addClass(click_target, "edit-product");
 
                             click_target_id = click_target.getAttribute('data-product-id');
 
-                        // get new price
-                            set_price_prompt = prompt("Set Price for '" + click_target.getAttribute('data-product-name').toUpperCase() + "'?");
+                        // display edit options
+                            edit_options_markup = "<ul class='options'>" + 
+                                                    "<li class='edit-wholesale-price'>wholesale price</li>" + 
+                                                    "<li class='edit-retail-price'>retail price</li>" + 
+                                                  "</ul>";
 
-                            if(set_price_prompt !== null){
+                            edit_btn.innerHTML += edit_options_markup;
 
-                                var product_price = click_target.getElementsByClassName('price')[0];
+                        // get dom nodes of options
+                            edit_options = edit_btn.getElementsByClassName('options')[0];
+                            edit_wholesale_price_btn = edit_options.getElementsByClassName('edit-wholesale-price')[0];
+                            edit_retail_price_btn = edit_options.getElementsByClassName('edit-retail-price')[0];
 
-                                update_product_price(click_target_id, set_price_prompt);
+                        // activate edit options
+                            edit_retail_price_btn.addEventListener('click', set_retail_price);
+                            edit_wholesale_price_btn.addEventListener('click', set_wholesale_price);
 
-                                product_price.innerHTML = "&#8358;" + set_price_prompt;
-                                addClass(product_price, "modified-value");
+                        // add options removal on next click to event stack
+                            setTimeout(function(){
 
-                                addClass(click_target, "editted-product");
-                            }
+                                screen.addEventListener('click', remove_edit_options_menu);                                
+                            }, 0);
 
-                        // remove visual identifier
-                            removeClass(click_target, "edit-product");
-                    }
 
-                    function update_product_price(product_id, price){
+                        function remove_edit_options_menu(){
 
-                        deviceStorage.get("transaction", function(ok, value){
+                            // remove edit options
+                                edit_options.parentNode.removeChild(edit_options);
 
+                            // remove visual identifier
+                                removeClass(click_target, "edit-product");
+
+                            // cleanup option remover
+                                screen.removeEventListener('click', remove_edit_options_menu);
+                        }
+
+                        function set_retail_price(){
+                            
                             // required vars
-                                var transactions_json = '{}',
-                                    transactions;
+                                var product_price = click_target.getElementsByClassName('retail-price')[0],
+                                    current_price = product_price.innerHTML,
+                                    clean_price = current_price.replace(/\D/g,"");
+                                //  click_target_id -- from edit_product scope 
 
-                            // get prexisting transactions
-                                if(value){ 
+                            // get user-entered price
+                                set_price_prompt = prompt(click_target.getAttribute('data-product-name').toUpperCase() + " - Retail Price", clean_price).replace(/\D/g,"");
 
-                                    transactions_json = value;                                    
+                            // filter cancels
+                                if(set_price_prompt === null || (set_price_prompt === clean_price && current_price === '-----') ){ return; }
+                            
+                            // update UI
+                                if(set_price_prompt === '0' || set_price_prompt === ''){ 
+
+                                    set_price_prompt = null;
+                                    product_price.innerHTML = "-----";
+                                } 
+
+                                else {
+                                    
+                                    product_price.innerHTML = "&#8358;" + set_price_prompt;
                                 }
 
-                            // add product update to next transaction
-                                transactions = JSON.parse(transactions_json);
+                            // update dbs
+                                update_product_retail_price(click_target_id, set_price_prompt);
+                                    
+                                addClass(product_price, "modified-value");
+                                addClass(click_target, "editted-product");
+                        }
 
-                                if(!transactions.product){ transactions.product = {}; }
+                        function set_wholesale_price(){
 
-                                if(!transactions.product[product_id]){ transactions.product[product_id] = {}; }
+                            // required vars
+                                var product_price = click_target.getElementsByClassName('wholesale-price')[0],
+                                    current_price = product_price.innerHTML,
+                                    clean_price = current_price.replace(/\D/g,"");
+                            
+                            // get new price 
+                                set_price_prompt = prompt( click_target.getAttribute('data-product-name').toUpperCase() + " - Wholesale Price", clean_price).replace(/\D/g,"");
+
+                            // filter cancels
+                                if(set_price_prompt === null || (set_price_prompt === clean_price && current_price === '-----') ) { return; }
+                            
+                            // update UI
+                                if(set_price_prompt === '0' || set_price_prompt === ''){ 
+
+                                    set_price_prompt = null;
+                                    product_price.innerHTML = "-----";
+                                } 
+
+                                else {
+                                    
+                                    product_price.innerHTML = "&#8358;" + set_price_prompt;
+                                }
+
+                                update_product_wholesale_price(click_target_id, set_price_prompt);
                                 
-                                transactions.product[product_id].price = encodeURIComponent( price );
+                                addClass(product_price, "modified-value");
+                                addClass(click_target, "editted-product");
+                        }
+                    }
 
-                                deviceStorage.set('transaction', JSON.stringify(transactions));
-                        });
+                    function manufacturer_filter(e){
+
+                        var dropdown = e.target,
+                            dropdown_selection = dropdown.options[dropdown.selectedIndex],
+                            selected_manufacturer_id = dropdown_selection.value,
+                            product_list = product_list_wrapper.getElementsByClassName('product');
+
+                            if(selected_manufacturer_id == -1){
+
+                                removeClass(product_list_wrapper, "filtered");
+                            }
+
+                            else{
+
+                                addClass(product_list_wrapper, "filtered");
+                            } 
+
+                            for(var id in product_list){
+
+                                var product = product_list[id];
+
+                                if(typeof product.parentNode == "undefined"){ continue; }
+
+                                if(product.getAttribute('data-manufacturer-id') == selected_manufacturer_id){
+
+                                    addClass(product, 'manufacturer-filter-match');
+                                }
+
+                                else {
+                                    
+                                    removeClass(product, 'manufacturer-filter-match');
+                                }
+                            }                        
+                    }
+
+                    function update_product_wholesale_price(product_id, price){
+
+                        create_transaction('product', product_id, 'WholesalePrice', price);
+                    }
+
+                    function update_product_retail_price(product_id, price){
+                        
+                        create_transaction('product', product_id, 'RetailPrice', price);
                     }
                 }
 
-        /* SCREENS */
+        /* SCREEN UTILS */
 
             // screen setup handler
                 function screenSetupHandlers(){
@@ -654,7 +1255,7 @@
 
                     activeScreens = [];
                     addToActiveScreens('landing');
-                    addToActiveScreens('tasks');
+                    addToActiveScreens('view-product');
                 } 
 
         /* NETWORK */
@@ -718,42 +1319,127 @@
 
                                     "process-transaction.php",
                                     "transaction=" + value,
-                                    function(response_json){
+                                    function(){
 
-                                        var response = JSON.parse(response_json);
+                                        var transaction_json = value,
+                                            resend_prompt; 
 
-                                        update_product_db_on_device();
+                                        return function(response_json){
 
-                                        console.log("-- TRANSACTION REPORT --");
+                                            var response;
 
-                                        // product updates in the transaction
-                                            if(response.product){
+                                            try {
 
-                                                deviceStorage.get('product', function(ok, value){
+                                                response = JSON.parse(response_json);
+                                            } 
 
-                                                    var product_db = JSON.parse(value);
-                                                    
-                                                    for(var id in response.product){
+                                            catch(e){
 
-                                                        var product_name;
+                                                console.log("TRANSACTION ERROR");
 
-                                                        for (var i = product_db.length - 1; i >= 0; i--) {
-                                                            
-                                                            if(product_db[product_db.length - 1 - i].Id == id){
+                                                // put failed transaction back on the transaction queue
+                                                    deviceStorage.get('transaction', function(ok, transaction_queue_json){
 
-                                                                product_name = product_db[product_db.length - 1 - i].Name;
-                                                                break;
-                                                            }
-                                                        }                                                   
+                                                        var requeue_json;
 
-                                                        for(var property in response.product[id]){
+                                                        if(transaction_queue_json){
 
-                                                            console.log(product_name.toUpperCase() + " " + property.toUpperCase() + " UPDATED TO '" + response.product[id][property] + "'");
+                                                            requeue_json = JSON.stringify(
+                                                                copyObj({
+
+                                                                    'srcObj': JSON.parse(transaction_queue_json),
+                                                                    'output': JSON.parse(transaction_json)
+                                                                })
+                                                            );
                                                         }
-                                                    }
-                                                });
+
+                                                        else {
+
+                                                            requeue_json = transaction_json;
+                                                        }
+
+                                                        deviceStorage.set('transaction', requeue_json);
+                                                        
+                                                        _publish(
+                                                            'requeue-failed-transaction',
+                                                            {
+                                                                "failed_transaction": transaction_json,
+                                                                "server_response": response_json,
+                                                                "queue_before_retry": transaction_queue_json,
+                                                                "requeue_json": requeue_json
+                                                            },
+                                                            'do-transaction' 
+                                                        );
+                                                    });
+
+                                                return false;
                                             }
-                                    }
+
+                                            console.log("-- TRANSACTION REPORT --");
+
+                                            // product updates in the transaction
+                                                if(response.product){
+
+                                                    deviceStorage.get('product', function(ok, value){
+
+                                                        var product_db_json = value,
+                                                            product_db = JSON.parse(product_db_json);
+                                                        
+                                                        for(var id in response.product){
+
+                                                            var product_name = "oops! :'(";
+
+                                                            // get product name
+                                                                if(response.product[id].name){
+
+                                                                    product_name = response.product[id].name;
+                                                                }
+
+                                                                else {
+
+                                                                    var product_db_id_model = key_model_db_json(product_db_json, "Id");
+
+                                                                    if(product_db_id_model[id]){
+
+                                                                        product_name = product_db_id_model[id].Name;
+                                                                    }
+
+                                                                    else {
+
+                                                                        var created_products_search = {},
+                                                                            search_id;
+
+                                                                        for (search_id in response.product) {                                                                            
+
+                                                                            if(search_id.indexOf('create-') !== 0){ continue }
+
+                                                                            created_products_search.product = response.product[search_id];
+
+                                                                            if(created_products_search.product.product_id == id){
+
+                                                                                product_name = created_products_search.product.name;
+                                                                                break;
+                                                                            }
+                                                                        }                                                   
+                                                                    }
+
+                                                                }
+
+                                                            // log updates
+                                                                for(var property in response.product[id]){
+
+                                                                    if(property === 'name'){ continue; }
+
+                                                                    console.log(product_name.toUpperCase() + " " + property.toUpperCase() + " UPDATED TO '" + response.product[id][property] + "'");
+                                                                }
+                                                        }
+
+                                                        _publish('transaction-metadata-updated', null, 'do-transaction');
+                                                        download_current_product_db();
+                                                    });
+                                                }
+                                        };
+                                    }()
                                 );
 
                                 deviceStorage.set('transaction', "{}");
@@ -770,24 +1456,41 @@
                         );
                 }
 
-            // update product db on device
-                function update_product_db_on_device(){
+            // update product db
+                function download_current_product_db(){
 
-                    deviceStorage.get('product', function(ok, value){
+                    download_to_local_db('product', 'get-product.php');
+                }
+
+            // update manufacturer db
+                function download_current_manufacturer_db(){
+
+                    download_to_local_db('manufacturer', 'get-manufacturer.php');
+                }
+
+            // download updates to db on device
+                function download_to_local_db(db_name, url){
+
+                    if(!db_name || !url){
+
+                        return false;
+                    }
+
+                    deviceStorage.get(db_name, function(ok, value){
                         
                         // get product db via ajax
                             HTTP_POST(
-                                "get-product.php", 
+                                url, 
                                 null,
                                 function(response){
 
                                     // filter unchanged list
-                                        if(value == response) { return; }
+                                        if(value === response) { return; }
                                         
                                     // update the pricelist
-                                        deviceStorage.set("product", response);
+                                        deviceStorage.set(db_name, response);
                                     
-                                    _publish("product-metadata-updated", response, "update-product-db-ajax");
+                                    _publish(db_name + "-metadata-updated", response, "download-current-" + db_name + "-db");
                                 }
                             );
                     });
@@ -908,38 +1611,64 @@
                         window.applicationCache.addEventListener('downloading', cacheDownloading);
                         window.applicationCache.addEventListener('updateready', cacheReady);
                     }
+
+                    
+                    // new appcache ready
+                        function cacheReady(){     
+
+                            alert('App Has Been Updated and will Restart Now');
+                            window.applicationCache.swapCache();
+                            location.reload(true);
+                        }
+
+                    // new appcache downloading
+                        function cacheDownloading(){
+
+                            alert("Downloading App Updates - Sorry for the Wait");
+                        }
                 }
 
-            // new appcache ready
-                function cacheReady(){     
-
-                    alert('App Has Been Updated and will Restart Now');
-                    window.applicationCache.swapCache();
-                    location.reload(true);
-                }
-
-            // new appcache downloading
-                function cacheDownloading(){
-
-                    alert("Downloading App Updates - Sorry for the Wait");
-                }
 
         /* OFFLINE STORAGE */
 
-            function setDeviceStorage(){
+            // create device storage
+                function createDeviceStorage(){
 
-                createDeviceStorage();
-            }
+                    deviceStorage = new Persist.Store('Pricing App Storage', {
 
-            function createDeviceStorage(){
+                        about: "Data Storage to enhance Offline usage",
+                        path: location.href
+                    });
+                }
 
-                deviceStorage = new Persist.Store('Pricing App Storage', {
+            // locally store data to push server-side
+                function create_transaction(type, id, property, value){
+                            
+                    // required vars
+                        var transactions_json = '{}';
 
-                    about: "Data Storage to enhance Offline usage",
-                    path: location.href
-                });
-            }
+                    // get transactions on device
+                        deviceStorage.get("transaction", function(ok, cache){
 
+                            // update transaction json on cache hit
+                                if(cache && JSON.parse(transactions_json)){ transactions_json = cache; }
+
+                            // add product update to next transaction
+                                transaction_db = JSON.parse(transactions_json);
+
+                                if(!transaction_db[type]){ transaction_db[type] = {}; }
+
+                                if(!transaction_db[type][id]){ transaction_db[type][id] = {}; }
+                                
+                                transaction_db[type][id][property] = value;
+
+                            // store it
+                                deviceStorage.set('transaction', JSON.stringify(transaction_db));
+
+                            // publish
+                                _publish("transaction-metadata-updated", {'type': type, 'id': id, 'property': property, 'value': value }, "create-" + type + "-transaction");
+                        });
+                }
 
         /* UTILS */
 
@@ -950,9 +1679,9 @@
                         notification, 
                         subscriber,
 
-                        function(){
+                        function(data){
 
-                            response(responseParams);
+                            response(data);
                             _unsubscribe(notification,subscriber);
                         },
 
@@ -1072,7 +1801,168 @@
                     return true;    
                 }
 
+            // model json by key
+                function key_model_db_json( db_json, key ){
 
+                    var db,
+                        modelled_db = {};
+
+                    db = JSON.parse( db_json );
+
+                    for(var row in db){
+
+                        modelled_db[ db[row][key] ] = db[row];
+                        modelled_db[ db[row][key] ]['db-index'] = row;
+                    }
+
+                    return modelled_db;
+                }
+
+
+
+            // model db by collection
+                function collection_model_db_json( db_json, key ){
+
+                    var db,
+                        modelled_db = {};
+
+                    db = JSON.parse( db_json );
+
+                    for(var row in db){
+
+                        if( !modelled_db[ db[row][key] ] ){  modelled_db[ db[row][key] ] = {}; }
+                        
+                        db[row]['db-index'] = row;
+                        modelled_db[ row[key] ].push( db[row] );
+                    }
+
+                    return modelled_db;
+                }
+
+            // context settings - cancel task
+                function create_cancel_task_btn(){
+
+                    var contextSettingsMenu = document.getElementById('context-settings'),
+                        cancelTaskBtnMarkup = "<div id='cancel-task' class='setting'>cancel task</div>";
+
+                    // create Cancel Task button                            
+                        contextSettingsMenu.innerHTML += cancelTaskBtnMarkup;
+
+                    // remove btn when task ends
+                        _subscribe_once("task-ended", "remove-cancel-task-btn", 
+
+                            function(){
+
+                                var cancel_task_btn = document.getElementById('cancel-task');
+
+                                cancel_task_btn.parentNode.removeChild(cancel_task_btn);
+                            }
+                        );
+
+                    // set behavior
+                        document.getElementById('cancel-task').addEventListener("click", function(){
+
+                            _publish("task-ended", "cancel-task-btn");
+                        });
+                }            
+
+            // context settings - add product
+                function create_add_product_btn(){
+
+                    var contextSettingsMenu = document.getElementById('context-settings'),
+                        addProductBtnMarkup = "<div id='start-add-product' class='setting'>+ add product</div>";
+
+                    // create add product button                            
+                        contextSettingsMenu.innerHTML += addProductBtnMarkup;
+
+                    // remove btn when task ends
+                        _subscribe_once("teardown-screen", "remove-add-product-btn", 
+
+                            function(){
+
+                                var add_product_btn = document.getElementById('start-add-product');
+
+                                add_product_btn.parentNode.removeChild(add_product_btn);
+                            }
+                        );
+
+                    // set behavior
+                        document.getElementById('start-add-product').addEventListener("click", addProductsWorkflow);
+                }            
+
+            // is object
+                function isObj(item){
+
+                    return (Object.prototype.toString.call(item) === '[object Object]');
+                }
+
+            // is array
+                function isArray(item){
+
+                    return (Object.prototype.toString.call(item) === '[object Array]');
+                }
+
+            // in array
+            // - @params: {item, array}
+            // - @returns: array index if item is in array, -1 if item is not in array, false if some required param was messed up 
+                function inArray(params){
+
+                    // return false if there is a missing/broken parameter
+                    if (!params || !isObj(params) || !params.item || !isArray(params.array)) {
+
+                        return false;   
+                    }
+
+                    // check array for item
+                    for (var i in params.array){
+
+                        // return index if it exists
+                        if (params.item === params.array[i]) {
+                            return i;
+                        }
+                    }
+
+                    // return -1 if it doesn't exist 
+                    return -1;
+                }
+
+            // copy Object
+            // - @params: {srcObj [,output ,]}
+            // - @returns: {} or output on success, false on fail
+                function copyObj(params){
+
+                    // exit if params are improper (params not an object, no source object, source object isn't a true object)
+                    if (!isObj(params) || !params.srcObj || !isObj(params.srcObj) ) {
+
+                        return false;
+                    }
+
+                    // use defined output or plain obj for return
+                    var output = (isObj(params.output) ? params.output : {});
+
+                    // check if there's any items to skip in the copy process
+                    var skip = (params.skip && isArray(params.skip) && params.skip.length > 0);
+
+                    // start copying
+                    for (var i in params.srcObj){
+
+                        if (params.srcObj.hasOwnProperty(i)){
+
+                            // ensure item isn't on the skip list
+                            if (skip === true && inArray({"item": i, "array": params.skip }) > -1 ) {
+
+                                continue;
+                            }
+
+                            // write 
+                            output[i] = params.srcObj[i];
+                        }    
+                    }
+
+                    return output;
+                }
+
+            
             function addProductsWorkflow(){
 
                 // activate add product screens 
@@ -1115,32 +2005,6 @@
                     });
             }
 
-            function create_cancel_task_btn(){
-
-                var contextSettingsMenu = document.getElementById('context-settings'),
-                    cancelTaskBtnMarkup = "<div id='cancel-task' class='setting'>cancel task</div>";
-
-                // create Cancel Task button                            
-                    contextSettingsMenu.innerHTML += cancelTaskBtnMarkup;
-
-                // remove btn when task ends
-                    _subscribe_once("task-ended", "remove-cancel-task-btn", 
-
-                        function(){
-
-                            var cancel_task_btn = document.getElementById('cancel-task');
-
-                            cancel_task_btn.parentNode.removeChild(cancel_task_btn);
-                        }
-                    );
-
-                // set behavior
-                    document.getElementById('cancel-task').addEventListener("click", function(){
-
-                        _publish("task-ended", "cancel-task-btn");
-                    });
-            }            
-            
             pubsub.log.crawl = function(key){
 
                 var results = "";
@@ -1194,5 +2058,14 @@
             goto = gotoScreen;
             ASE = activeScreens;
             currentIntervals = intervals;
+            peepDB = function(db_name){
+
+                deviceStorage.get(db_name, function(ok, value){
+
+                    if(!ok){ console.log("couldn't retrieve " + db_name + " db"); return; }
+
+                    console.log( JSON.parse(value) );
+                });
+            };
         });
 }());

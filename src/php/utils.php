@@ -1,33 +1,60 @@
+<?php
+# -----------------------------------------------
+# DB CONFIGS
+
 <% 
 	// GRUNT TEMPLATE PROCESSING ENV
 
 	var build_env = grunt.config('build-env') || 'debug',
-		env_db_credentials = dbcredentials[ build_env ];  
+		env_db_credentials;
+
+		env_db_credentials = dbcredentials[ build_env ] ? dbcredentials[ build_env ] : false;
+
+		if(env_db_credentials === false){
+		%>
+
+		    $url=parse_url(getenv("CLEARDB_DATABASE_URL"));
+
+			define ("DB_USER", $url["user"]);
+			define ("DB_PASSWORD", $url["pass"]);
+			define ("DB_HOST", $url["host"]);	
+			define ("DB_NAME", substr($url["path"],1));
+		<%
+		}
+
+		else { 
+		%>
+
+			define ("DB_USER", '<%= env_db_credentials.user %>');
+			define ("DB_PASSWORD", '<%= env_db_credentials.password %>');
+			define ("DB_HOST", '<%= env_db_credentials.host %>');	
+			define ("DB_NAME", '<%= env_db_credentials.database %>');
+		<%
+		}  
 %>
-<?php
 
 # -----------------------------------------------
 # CONSTANTS
 
-	define ("DB_USER", '<%= env_db_credentials.user %>');
-	define ("DB_PASSWORD", '<%= env_db_credentials.password %>');
-	define ("DB_HOST", '<%= env_db_credentials.host %>');	
-	define ("DB_NAME", '<%= env_db_credentials.database %>');
 
 	define ("DB_PRODUCT_TABLE", 'product');
 	define ("DB_MANUFACTURER_TABLE", 'manufacturer');
 	define ("DB_PRODUCT_ALIAS_TABLE", 'product_alias');
+
+	define ("DB_RETAIL_PRICE_COLUMN", 'RetailPrice');
+	define ("DB_WHOLESALE_PRICE_COLUMN", 'WholesalePrice');
 
 
 # -----------------------------------------------
 # DATABASE
 
 	// update product price
-		function update_price($product_id, $price){
+		function update_price($product_id, $price, $price_type = null){
 
 			// req vars
 				$response = array();
 				$response['success'] = false;
+				$column_name;
 
 			// filter missing vars
 				if(!$product_id){
@@ -35,14 +62,26 @@
 					$response['msg'] = "PRODUCT ID FOR PRICE UPDATE IS MISSING";
 					return $response;
 				}
-				if(!$price){
+				
+				if(empty($price) && $price !== null ){
 
 					$response['msg'] = "NO UPDATED PRICE TO STORE";
 					return $response;
 				}
 
+				if(!$price_type || $price_type == "retail"){
+
+					$column_name = DB_RETAIL_PRICE_COLUMN;
+				}
+
+				elseif($price_type == "wholesale"){
+					
+					$column_name = DB_WHOLESALE_PRICE_COLUMN;
+				}
+
+
 			// update db
-				$update_price_querystring = "UPDATE `" . DB_NAME ."`.`". DB_PRODUCT_TABLE . "` SET `Price` = '" . $price . "' WHERE `Id` = " . $product_id;
+				$update_price_querystring = "UPDATE `" . DB_NAME ."`.`". DB_PRODUCT_TABLE . "` SET `" . $column_name . "` = '" . $price . "' WHERE `Id` = " . $product_id;
 				$update_price_query = mysql_query( $update_price_querystring );
 
 				if(!$update_price_query){
@@ -53,7 +92,7 @@
 				else {
 
 					$response['success'] = true;
-					$response['msg'] = 'PRICE FOR PRODUCT ID ' . $product_id . ' UPDATED TO "' . $price . '"';					
+					$response['msg'] =  $price_type . ' PRICE FOR PRODUCT ID ' . $product_id . ' UPDATED TO "' . $price . '"';					
 				}
 
 			return $response;
@@ -79,16 +118,6 @@
 					return $response; 
 				}
 
-			// filter products already in db
-				$duplicate_product_check_querystring = "SELECT `Id` FROM `" . DB_PRODUCT_TABLE . "` WHERE `Name` = '" . $name . "' LIMIT 1";
-				$duplicate_product_check_query = mysql_query($duplicate_product_check_querystring);
-
-				if( mysql_num_rows($duplicate_product_check_query) > 0 ){
-
-					$response['msg'] = "'" . $name . "' ALREADY EXISTS IN DATABASE (PRODUCT)";
-					return $response;
-				}
-
 			// get manufacturer id
 				$manufacturer_id;
 				$get_manufacturer_id_querystring = "SELECT `Id` FROM `" . DB_MANUFACTURER_TABLE . "` WHERE `Name` = '" . $manufacturer . "' LIMIT 1";
@@ -103,13 +132,8 @@
 						$response['msg'] = "COULD NOT RETRIEVE OR STORE MANUFACTURER";
 						return $response;
 					}
-
-					$check_for_manufacturer_query = mysql_query($get_manufacturer_id_querystring);
-
-					while ($check_result = mysql_fetch_assoc($check_for_manufacturer_query)){
 					
-						$manufacturer_id = $check_result["Id"];
-					}
+					$manufacturer_id = mysql_insert_id();
 				} 
 
 				else {
@@ -117,6 +141,19 @@
 					while( $result = mysql_fetch_assoc($get_manufacturer_id_query) ){
 
 						$manufacturer_id = $result["Id"];
+					}
+				}
+
+			// prevent duplicate product entries for that manufacturer 
+				$duplicate_product_check_querystring = "SELECT `Id`, `ManufacturerId` FROM `" . DB_PRODUCT_TABLE . "` WHERE `Name` = '" . $name . "'";
+				$duplicate_product_check_query = mysql_query($duplicate_product_check_querystring);
+
+				while( $result = mysql_fetch_assoc($duplicate_product_check_query) ){
+
+					if( $manufacturer_id == $result['ManufacturerId']){
+
+						$response['msg'] = "'" . $name . "' ALREADY EXISTS IN " . $manufacturer . "'S PRODUCT LIST";
+						return $response;
 					}
 				}
 
@@ -128,10 +165,13 @@
 				if(!$add_product_query){
 
 					$response['msg'] = mysql_error();
+					return $response;
 				}
-					$response['success'] = true;
-					$response['msg'] = "'" . $name . "' ADDED TO PRODUCT DATABASE";
-					$response['product_id'] = mysql_insert_id();
+					
+				$response['success'] = true;
+				$response['msg'] = "'" . $name . "' ADDED TO PRODUCT DATABASE";
+				$response['manufacturer_id'] = $manufacturer_id;
+				$response['product_id'] = mysql_insert_id();
 
 			// save product alias
 				add_alias($name, $response['product_id']);
@@ -172,7 +212,8 @@
 				$add_manufacturer_query = mysql_query($add_manufacturer_querystring);
 
 				$response['success'] = true;
-				$response['msg'] = "MANUFACTURER '" . $name . "' ADDED";		
+				$response['msg'] = "MANUFACTURER '" . $name . "' ADDED";
+				$response['manufacturer_id'] = mysql_insert_id();		
 
 				return $response;
 		}

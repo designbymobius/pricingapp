@@ -25,21 +25,20 @@
 			<div id="start-app" class="btn large">Get Started</div>
 		</div>
 
-		<div id="tasks" class="fullscreen tasks">
-			
-			<div class="headline">Tasks</div>
-			<div class="title">What are you trying to do?</div>
-			<ul id="task-list">
-				<li id="start-view-products">View Product List</li>
-				<li id="start-add-product">Add New Products</li>
-			</ul>
+		<div id="view-product-list" class="fullscreen view-product">
+		
+			<div id="manufacturer-filter">
+				<label>Manufacturer</label>
+				<select id="manufacturer-list"></select>
+			</div>
+			<div id="product-list"></div>
 		</div>
 
 		<div id="add-product-metadata" class="fullscreen add-product">
 			
-			<div class="headline">Basic Product Details</div>
-			<div class="title">What is the Product and its Manufacturer's Name? </div>
-			<input class="manufacturer-name" placeholder="Manufacturer">
+			<div class="headline">New Product Details</div>
+			<select class="manufacturer-list large"></select>
+			<input class="manufacturer-name" type="hidden" placeholder="Manufacturer">
 			<input class="product-name" placeholder="Product Name">
 			<div class="btn small">Next Step</div>	
 		</div>
@@ -53,11 +52,6 @@
 				<span class="product-name"></span>
 			</div>
 			<div id="submit-add-product" class="btn large">Yes - Add It</div>	
-		</div>
-
-		<div id="view-product-list" class="fullscreen view-product">
-			
-			<div id="product-list"></div>
 		</div>
 
 		<!-- build:script inline core --><!-- /build -->

@@ -28,7 +28,8 @@ module.exports = function(grunt){
 						lastsemic: true
 					},
 
-					beforeconcat: '<%= coreJS %>'
+					beforeconcat: '<%= coreJS %>',
+					afterconcat: '<%= srcDirectory %>/js/min/core.min.js'
 				},
 
 			// uglify
@@ -36,7 +37,7 @@ module.exports = function(grunt){
 			
 					core_scripts: {
 						files: {
-							'<%= srcDirectory %>/js/min/core.min.js': ['<%= libsJS %>','<%= coreJS %>']
+							'<%= srcDirectory %>/js/min/core.min.js': ['<%= coreJS %>']
 						}
 					}
 				},
@@ -66,20 +67,18 @@ module.exports = function(grunt){
 			            }
 			        },
 
-			        production: {
+			        build: {
 			            src: '<%= srcDirectory %>/index.html', 
 			            dest: '<%= buildDirectory %>/index.html',
 			            options: {
 			                
 			                scripts: {
-			                    core: ['<%= libsJS %>', '<%= srcDirectory %>/js/min/core.min.js'],
+			                    core: ['<%= libsJS %>','<%= coreJS %>'],
 			                },
 			                
 			                styles: {
-			                    base: '<%= srcDirectory %>/css/min/base.min.css',
+			                    base: '<%= coreCSS %>',
 			                },
-			                
-			                collapseWhitespace: true
 			            }
 			        }
 			    },
@@ -92,7 +91,7 @@ module.exports = function(grunt){
 					options: {
 						basePath:"<%= debugDirectory %>/",
 						fallback: ["/ index.html"],
-						network: ["*", "server-check.php"],	
+						network: ["add-product.php", "get-product.php", "get-manufacturer.php", "process-transaction.php", "server-check.php", "setup-db.php" ],	
 						preferOnline: true,
 				        timestamp: true,
 				        verbose: false,
@@ -123,10 +122,9 @@ module.exports = function(grunt){
 
 						processContent: function(content, path){
 
-							// process template 
-								content = grunt.template.process( content );
+							grunt.config('build-env', 'debug');
 
-							return content;
+							return grunt.template.process( content );
 						}
 					}
 				},
@@ -260,7 +258,7 @@ module.exports = function(grunt){
 		grunt.loadNpmTasks('grunt-newer');
 
 	// Register Tasks
-		grunt.registerTask('updateJS', ['newer:jshint:beforeconcat', 'htmlbuild:debug', 'manifest', 'uglify', 'htmlbuild:production', 'copy:manifest', 'notify:js']);
+		grunt.registerTask('updateJS', ['newer:jshint:beforeconcat', 'htmlbuild', 'manifest', 'copy:manifest', 'notify:js']);
 		grunt.registerTask('updateCSS', ['cssmin', 'htmlbuild', 'manifest', 'copy:manifest', 'notify:css']);
 		grunt.registerTask('updateHTML', ['htmlbuild', 'manifest', 'copy:manifest', 'notify:html']);
 }
