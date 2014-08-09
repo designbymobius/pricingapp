@@ -43,14 +43,22 @@
 					if( property_exists($product, "WholesalePrice") ){
 
 						$wholesale_price_update = update_price($product_id, $product->WholesalePrice, "wholesale");
-						$response['product'][$product_id]["WholesalePrice"] = $product->WholesalePrice;
+						
+						if($wholesale_price_update['success'] === true){
+
+							$response['product'][$product_id]["WholesalePrice"] = $product->WholesalePrice;
+						} 
 					}
 				
 				// retail price updates
 					if( property_exists($product, "RetailPrice") ){
 
 						$price_update = update_price($product_id, $product->RetailPrice, "retail");
-						$response['product'][$product_id]["RetailPrice"] = $product->RetailPrice;
+						
+						if($price_update['success'] === true){
+							
+							$response['product'][$product_id]["RetailPrice"] = $product->RetailPrice;
+						}
 					}
 			}
 		}

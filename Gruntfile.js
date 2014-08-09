@@ -91,8 +91,13 @@ module.exports = function(grunt){
 					options: {
 						basePath:"<%= debugDirectory %>/",
 						fallback: ["/ index.html"],
-						network: ["add-product.php", "get-product.php", "get-manufacturer.php", "process-transaction.php", "server-check.php", "setup-db.php" ],	
-						preferOnline: true,
+						network: [	
+									"server-check.php", 
+									"get-product.php", 
+									"get-manufacturer.php", 
+									"process-transaction.php", 
+									"http://www.google-analytics.com" 
+								],
 				        timestamp: true,
 				        verbose: false,
 					},				

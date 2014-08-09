@@ -83,6 +83,9 @@
                     // Prepare Screen Setup Listeners
                         screenSetupHandlers();
 
+                    // Setup Google Analytics
+                        configureGoogleAnalytics();
+
                     // Activate the Requested Screen
                         gotoScreen( activeScreenIndex );
                 }
@@ -402,7 +405,7 @@
                     function add_product_to_db(){
 
                         // required vars
-                        var product_metadata = {},
+                            var product_metadata = {},
                             restart_task;
                             
                             product_metadata.name = encodeURIComponent( addProductName );
@@ -1152,7 +1155,10 @@
                             'scroll-screen-into-view', 
                             function(){ 
                                 
-                                scrollTo( thisScreen.offsetTop, 400);
+                                scrollTo( thisScreen.offsetTop, 400, function(){
+
+                                    _publish("arrived-at-new-screen", thisScreen.id, "scroll-screen-into-view");
+                                });
                             }
                         );
 
@@ -1260,6 +1266,28 @@
 
         /* NETWORK */
 
+            // configure google analytics
+                function configureGoogleAnalytics(){
+
+                    // page view
+                        _subscribe('arrived-at-new-screen', 'google-analytics', function(data){
+
+                            ga('send','pageview', data.notificationParams);
+                        });
+
+                    // successful update
+                        _subscribe('transaction-processed', 'google-analytics', function(){
+
+                            ga('send','event','prices-updated');
+                        });
+
+                    // failed update
+                        _subscribe('transaction-failed', 'google-analytics', function(data){
+
+                            ga('send','event','transaction-error', data.notificationParams.server_response);
+                        });
+                }
+
             // configure network detection
                 network.options = {
 
@@ -1292,14 +1320,7 @@
                 }
 
             // send transaction to server
-                function doTransaction(){ 
-
-                    // req vars
-                    var stopTransactions = function(){
-
-                        clearInterval( intervals.transaction );
-                        delete intervals.transaction;
-                    };
+                function doTransaction(){                  
 
                     // check every 30 secs
                         intervals.transaction = setInterval( function(){
@@ -1335,9 +1356,13 @@
 
                                             catch(e){
 
-                                                console.log("TRANSACTION ERROR");
+                                                _publish('transaction-failed', {
 
-                                                // put failed transaction back on the transaction queue
+                                                    transaction: JSON.parse(transaction_json),
+                                                    server_response: response_json
+                                                });
+
+                                                // put failed transaction back on the queue
                                                     deviceStorage.get('transaction', function(ok, transaction_queue_json){
 
                                                         var requeue_json;
@@ -1371,8 +1396,6 @@
                                                             'do-transaction' 
                                                         );
                                                     });
-
-                                                return false;
                                             }
 
                                             console.log("-- TRANSACTION REPORT --");
@@ -1434,7 +1457,7 @@
                                                                 }
                                                         }
 
-                                                        _publish('transaction-metadata-updated', null, 'do-transaction');
+                                                        _publish('transaction-processed', null, 'do-transaction');
                                                         download_current_product_db();
                                                     });
                                                 }
@@ -1448,12 +1471,13 @@
                         }, 1000 * 60 * 0.5);
 
                     // stop transaction on disconnect from the internet
-                        _subscribe_once(
-                            "network-down",
-                            "transaction",
-                            stopTransactions,
-                            null
-                        );
+                        _subscribe_once( "network-down", "transaction", stopTransactions, null );
+
+                    function stopTransactions(){
+
+                        clearInterval( intervals.transaction );
+                        delete intervals.transaction;
+                    }
                 }
 
             // update product db
@@ -1699,7 +1723,7 @@
                         var offset = window.pageYOffset,
                             delta  = target - window.pageYOffset; // Y-offset difference
                             duration = duration || 400;              // default 400ms animation
-                            callback = callback || function(){ _publish("arrived-at-new-screen", null, "scroll-screen-into-view"); };
+                            callback = (callback && typeof callback === "function" ? callback : function(){});   // default do function
                             start = Date.now();                       // get start time
                             factor = 0;
 
@@ -1978,30 +2002,10 @@
                     _subscribe_once('task-ended', 'task-teardown', function(){
 
                         gotoScreen(1);
-                        setTimeout(function(){
+
+                        _subscribe_once('arrived-at-new-screen', 'cleanup-active-screens', function(){
                             removeActiveScreens('add-product');
-                        }, 250);
-                    });
-            }
-
-            function viewProductsWorkflow(){
-
-                // activate add product screens 
-                    addToActiveScreens('view-product');
-                
-                // progress UI
-                    gotoNextScreen();
-
-                // add cancel task btn to HUD
-                    create_cancel_task_btn();
-
-                // clean up task when it ends
-                    _subscribe_once('task-ended', 'task-teardown', function(){
-
-                        gotoScreen(1);
-                        setTimeout(function(){
-                            removeActiveScreens('view-product');
-                        }, 250);
+                        });
                     });
             }
 
